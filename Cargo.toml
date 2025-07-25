@@ -1,0 +1,10 @@
+[package]
+name = "terge"
+version = "0.1.0"
+edition = "2024"
+
+[[example]]
+name = "counter"
+path = "examples/counter.rs"
+
+[dependencies]
