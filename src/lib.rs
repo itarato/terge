@@ -1,5 +1,7 @@
 use std::{io::Write, time::Duration};
 
+use crossterm::event::{Event, poll, read};
+
 pub trait App {
     fn reset(&mut self);
     fn update(&mut self);
@@ -66,9 +68,18 @@ impl Terge {
         }
     }
 
+    fn turn_on_terminal_raw_mode(&self) {
+        crossterm::terminal::enable_raw_mode().expect("Failed to enable raw mode");
+    }
+
+    fn turn_off_terminal_raw_mode(&self) {
+        crossterm::terminal::disable_raw_mode().expect("Failed to disable raw mode");
+    }
+
     pub fn run(&mut self) {
         self.gfx.refresh_state();
         self.app.reset();
+        self.turn_on_terminal_raw_mode();
 
         let mut frame_start_μs;
 
@@ -80,6 +91,27 @@ impl Terge {
 
             self.gfx.flush_buffer();
 
+            if poll(Duration::from_millis(1)).expect("Failed polling events") {
+                // It's guaranteed that the `read()` won't block when the `poll()`
+                // function returns `true`
+                match read().expect("Failed reading") {
+                    // Event::FocusGained => println!("FocusGained"),
+                    // Event::FocusLost => println!("FocusLost"),
+                    Event::Key(event) => {
+                        println!("{:?}", event);
+                        break;
+                    }
+                    Event::Mouse(event) => println!("{:?}", event),
+                    // #[cfg(feature = "bracketed-paste")]
+                    // Event::Paste(data) => println!("Pasted {:?}", data),
+                    Event::Resize(width, height) => {
+                        self.gfx.width = width as usize;
+                        self.gfx.height = height as usize;
+                    }
+                    _ => {}
+                }
+            }
+
             let current_μs = get_current_μs();
             let elapsed_μs = current_μs - frame_start_μs;
 
@@ -89,6 +121,12 @@ impl Terge {
                 ));
             }
         }
+    }
+}
+
+impl Drop for Terge {
+    fn drop(&mut self) {
+        self.turn_off_terminal_raw_mode();
     }
 }
 
