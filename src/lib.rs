@@ -3,8 +3,8 @@ use std::{io::Write, time::Duration};
 use crossterm::event::{Event, KeyCode, poll, read};
 
 pub trait App {
-    fn reset(&mut self);
-    fn update(&mut self, event: Option<Event>) -> bool;
+    fn reset(&mut self, gfx: &mut Gfx);
+    fn update(&mut self, event: Option<Event>, gfx: &mut Gfx) -> bool;
     fn draw(&self, gfx: &mut Gfx);
 }
 
@@ -80,7 +80,7 @@ impl Terge {
 
     pub fn run(&mut self) {
         self.gfx.refresh_state();
-        self.app.reset();
+        self.app.reset(&mut self.gfx);
         self.turn_on_terminal_raw_mode();
 
         let mut frame_start_ms;
@@ -110,7 +110,9 @@ impl Terge {
                 None
             };
 
-            self.app.update(event);
+            if !self.app.update(event, &mut self.gfx) {
+                self.should_terminate = true;
+            }
             self.app.draw(&mut self.gfx);
 
             self.gfx.flush_buffer();
@@ -128,6 +130,10 @@ impl Terge {
 
     pub fn set_target_fps(&mut self, target_fps: u128) {
         self.target_frame_length_ms = 1_000 / target_fps;
+    }
+
+    pub fn disable_fps(&mut self) {
+        self.target_frame_length_ms = 0;
     }
 }
 

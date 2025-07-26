@@ -7,6 +7,10 @@ edition = "2024"
 name = "counter"
 path = "examples/counter.rs"
 
+[[example]]
+name = "pong"
+path = "examples/pong.rs"
+
 [dependencies]
 term_size = "0.3"
 crossterm = "0.29"

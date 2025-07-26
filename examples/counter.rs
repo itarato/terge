@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event};
+use crossterm::event::Event;
 use terge::{Gfx, Terge};
 
 struct App {
@@ -34,7 +34,7 @@ impl terge::App for App {
         );
     }
 
-    fn update(&mut self, event: Option<Event>) -> bool {
+    fn update(&mut self, event: Option<Event>, gfx: &mut Gfx) -> bool {
         if let Some(event) = event {
             match event {
                 _ => {}
@@ -54,13 +54,13 @@ impl terge::App for App {
         true
     }
 
-    fn reset(&mut self) {
+    fn reset(&mut self, gfx: &mut Gfx) {
         self.counter = 0;
     }
 }
 
 fn main() {
     let mut engine = Terge::new(Box::new(App::new()));
-    engine.set_target_fps(24);
+    engine.set_target_fps(120);
     engine.run();
 }
