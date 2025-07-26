@@ -1,10 +1,10 @@
 use std::{io::Write, time::Duration};
 
-use crossterm::event::{Event, poll, read};
+use crossterm::event::{Event, KeyCode, poll, read};
 
 pub trait App {
     fn reset(&mut self);
-    fn update(&mut self);
+    fn update(&mut self, event: Option<Event>) -> bool;
     fn draw(&self, gfx: &mut Gfx);
 }
 
@@ -46,7 +46,7 @@ impl Gfx {
     }
 }
 
-fn get_current_μs() -> u128 {
+fn get_current_ms() -> u128 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -56,7 +56,8 @@ fn get_current_μs() -> u128 {
 pub struct Terge {
     app: Box<dyn App>,
     gfx: Gfx,
-    target_frame_length_μs: u128,
+    target_frame_length_ms: u128,
+    should_terminate: bool,
 }
 
 impl Terge {
@@ -64,7 +65,8 @@ impl Terge {
         Self {
             app,
             gfx: Gfx::new(),
-            target_frame_length_μs: 16,
+            target_frame_length_ms: 16,
+            should_terminate: false,
         }
     }
 
@@ -81,46 +83,51 @@ impl Terge {
         self.app.reset();
         self.turn_on_terminal_raw_mode();
 
-        let mut frame_start_μs;
+        let mut frame_start_ms;
 
-        loop {
-            frame_start_μs = get_current_μs();
+        while !self.should_terminate {
+            frame_start_ms = get_current_ms();
 
-            self.app.update();
+            let event = if poll(Duration::from_millis(1)).expect("Failed polling events") {
+                read()
+                    .map(|event| {
+                        match event {
+                            Event::Key(key_event) => {
+                                if key_event.code == KeyCode::Esc {
+                                    self.should_terminate = true;
+                                }
+                            }
+                            Event::Resize(width, height) => {
+                                self.gfx.width = width as usize;
+                                self.gfx.height = height as usize;
+                            }
+                            _ => {}
+                        }
+                        event
+                    })
+                    .ok()
+            } else {
+                None
+            };
+
+            self.app.update(event);
             self.app.draw(&mut self.gfx);
 
             self.gfx.flush_buffer();
 
-            if poll(Duration::from_millis(1)).expect("Failed polling events") {
-                // It's guaranteed that the `read()` won't block when the `poll()`
-                // function returns `true`
-                match read().expect("Failed reading") {
-                    // Event::FocusGained => println!("FocusGained"),
-                    // Event::FocusLost => println!("FocusLost"),
-                    Event::Key(event) => {
-                        println!("{:?}", event);
-                        break;
-                    }
-                    Event::Mouse(event) => println!("{:?}", event),
-                    // #[cfg(feature = "bracketed-paste")]
-                    // Event::Paste(data) => println!("Pasted {:?}", data),
-                    Event::Resize(width, height) => {
-                        self.gfx.width = width as usize;
-                        self.gfx.height = height as usize;
-                    }
-                    _ => {}
-                }
-            }
+            let current_ms = get_current_ms();
+            let elapsed_ms = current_ms - frame_start_ms;
 
-            let current_μs = get_current_μs();
-            let elapsed_μs = current_μs - frame_start_μs;
-
-            if elapsed_μs < self.target_frame_length_μs {
+            if elapsed_ms < self.target_frame_length_ms {
                 std::thread::sleep(Duration::from_millis(
-                    (self.target_frame_length_μs - elapsed_μs) as u64,
+                    (self.target_frame_length_ms - elapsed_ms) as u64,
                 ));
             }
         }
+    }
+
+    pub fn set_target_fps(&mut self, target_fps: u128) {
+        self.target_frame_length_ms = 1_000 / target_fps;
     }
 }
 

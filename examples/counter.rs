@@ -1,3 +1,4 @@
+use crossterm::event::{self, Event};
 use terge::{Gfx, Terge};
 
 struct App {
@@ -33,7 +34,13 @@ impl terge::App for App {
         );
     }
 
-    fn update(&mut self) {
+    fn update(&mut self, event: Option<Event>) -> bool {
+        if let Some(event) = event {
+            match event {
+                _ => {}
+            }
+        }
+
         let new_timestamp = get_timestamp();
 
         if new_timestamp > self.timestamp {
@@ -43,6 +50,8 @@ impl terge::App for App {
         } else {
             self.counter += 1;
         }
+
+        true
     }
 
     fn reset(&mut self) {
@@ -52,5 +61,6 @@ impl terge::App for App {
 
 fn main() {
     let mut engine = Terge::new(Box::new(App::new()));
+    engine.set_target_fps(24);
     engine.run();
 }
