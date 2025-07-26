@@ -8,3 +8,4 @@ name = "counter"
 path = "examples/counter.rs"
 
 [dependencies]
+term_size = "0.3"

@@ -1,23 +1,48 @@
 use terge::{Gfx, Terge};
 
 struct App {
-    counter: usize,
+    counter: u64,
+    fps: u64,
+    timestamp: u64,
+}
+
+fn get_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }
 
 impl App {
     fn new() -> Self {
-        Self { counter: 0 }
+        Self {
+            counter: 0,
+            fps: 0,
+            timestamp: get_timestamp(),
+        }
     }
 }
 
 impl terge::App for App {
     fn draw(&self, gfx: &mut Gfx) {
         gfx.clear_screen();
-        gfx.draw_text(format!("Hello World: {}", self.counter).as_str(), 20, 10);
+        gfx.draw_text(
+            format!("FPS: {}", self.fps).as_str(),
+            gfx.width / 2 - 4,
+            gfx.height / 2,
+        );
     }
 
     fn update(&mut self) {
-        self.counter += 1;
+        let new_timestamp = get_timestamp();
+
+        if new_timestamp > self.timestamp {
+            self.fps = (self.counter + 1) / (new_timestamp - self.timestamp);
+            self.counter = 0;
+            self.timestamp = new_timestamp;
+        } else {
+            self.counter += 1;
+        }
     }
 
     fn reset(&mut self) {
