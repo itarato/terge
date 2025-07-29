@@ -1,5 +1,5 @@
 use crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind};
-use log::{error, info};
+use log::{debug, error, info};
 use terge::Terge;
 
 type I32Point = (i32, i32);
@@ -59,33 +59,57 @@ impl terge::App for App {
         gfx.clear_screen();
 
         if let Some(draw_action) = &self.draw_mode_details {
-            let start_x = draw_action.start.0.min(self.current_mouse_pos.0);
-            let end_x = draw_action.start.0.max(self.current_mouse_pos.0);
-            let start_y = draw_action.start.1.min(self.current_mouse_pos.1);
-            let end_y = draw_action.start.1.max(self.current_mouse_pos.1);
+            let start_x = draw_action.start.0;
+            let start_y = draw_action.start.1;
+            let end_x = self.current_mouse_pos.0;
+            let end_y = self.current_mouse_pos.1;
+
+            let x_min = start_x.min(end_x);
+            let x_max = start_x.max(end_x);
+            let y_min = start_y.min(end_y);
+            let y_max = start_y.max(end_y);
 
             match draw_action.mode {
                 DrawMode::Rect => {
-                    for y in start_y..=end_y {
-                        gfx.draw_text(BLOCK_CHAR, start_x as usize, y as usize);
-                        gfx.draw_text(BLOCK_CHAR, end_x as usize, y as usize);
+                    for y in y_min..=y_max {
+                        gfx.draw_text(BLOCK_CHAR, x_min as usize, y as usize);
+                        gfx.draw_text(BLOCK_CHAR, x_max as usize, y as usize);
                     }
                     gfx.draw_text(
-                        &BLOCK_CHAR.repeat((end_x - start_x) as usize),
-                        start_x as usize,
-                        start_y as usize,
+                        &BLOCK_CHAR.repeat((x_max - x_min) as usize),
+                        x_min as usize,
+                        y_min as usize,
                     );
                     gfx.draw_text(
-                        &BLOCK_CHAR.repeat((end_x - start_x) as usize),
-                        start_x as usize,
-                        end_y as usize,
+                        &BLOCK_CHAR.repeat((x_max - x_min) as usize),
+                        x_min as usize,
+                        y_max as usize,
                     );
                 }
                 DrawMode::Line => {
-                    let diff_x = end_x - start_x;
-                    let diff_y = end_y - start_y;
-                    if diff_x >= diff_y {
-                        for x in start_x..=end_x {}
+                    let diff_x = (end_x - start_x) as f32;
+                    let diff_y = (end_y - start_y) as f32;
+                    let diff_x_abs = diff_x.abs();
+                    let diff_y_abs = diff_y.abs();
+
+                    if diff_x_abs >= diff_y_abs {
+                        if diff_x != 0.0 {
+                            for x in x_min..=x_max {
+                                let y = ((diff_y / diff_x) * (x as f32 - start_x as f32)
+                                    + start_y as f32)
+                                    as usize;
+                                gfx.draw_text(BLOCK_CHAR, x as usize, y);
+                            }
+                        }
+                    } else {
+                        if diff_y != 0.0 {
+                            for y in y_min..=y_max {
+                                let x = ((diff_x / diff_y) * (y as f32 - start_y as f32)
+                                    + start_x as f32)
+                                    as usize;
+                                gfx.draw_text(BLOCK_CHAR, x, y as usize);
+                            }
+                        }
                     }
                 }
                 _ => unreachable!("Draw action cannot be nothing"),

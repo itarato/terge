@@ -10,7 +10,7 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, poll, read},
     terminal,
 };
-use log::debug;
+use log::{debug, trace};
 
 pub trait App {
     fn reset(&mut self, gfx: &mut Gfx);
@@ -169,7 +169,7 @@ impl Terge {
                     if poll(Duration::from_millis(1)).expect("Failed polling for events") {
                         let event = read().expect("Failed reading event.");
 
-                        debug!("Event: {:?}", event);
+                        trace!("Event: {:?}", event);
 
                         ch_writer.send(event).expect("Failed sending event.");
                     }
