@@ -1,5 +1,5 @@
 use crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind};
-use log::{debug, error, info};
+use log::{error, info};
 use terge::Terge;
 
 type I32Point = (i32, i32);

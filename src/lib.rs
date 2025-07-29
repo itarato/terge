@@ -10,7 +10,7 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, poll, read},
     terminal,
 };
-use log::{debug, trace};
+use log::trace;
 
 pub trait App {
     fn reset(&mut self, gfx: &mut Gfx);
