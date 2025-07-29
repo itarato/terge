@@ -70,10 +70,16 @@ fn draw_line(gfx: &mut Gfx, start: I32Point, end: I32Point) {
     }
 }
 
+struct Rect {
+    start: I32Point,
+    end: I32Point,
+}
+
 struct App {
     draw_mode_details: Option<DrawAction>,
     draw_mode_indent: DrawMode,
     current_mouse_pos: I32Point,
+    rectangles: Vec<Rect>,
 }
 
 impl App {
@@ -82,6 +88,7 @@ impl App {
             draw_mode_details: None,
             draw_mode_indent: DrawMode::Rect,
             current_mouse_pos: (-1, -1),
+            rectangles: vec![],
         }
     }
 
@@ -103,6 +110,11 @@ impl App {
     }
 
     fn end_draw_mode(&mut self) {
+        match &self.draw_mode_details {
+            None => {}
+            Some(action) => {}
+        };
+
         self.draw_mode_details = None;
     }
 }
