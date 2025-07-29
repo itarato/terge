@@ -1,4 +1,4 @@
-use crossterm::event::{Event, MouseButton, MouseEventKind};
+use crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind};
 use log::{error, info};
 use terge::Terge;
 
@@ -64,20 +64,32 @@ impl terge::App for App {
             let start_y = draw_action.start.1.min(self.current_mouse_pos.1);
             let end_y = draw_action.start.1.max(self.current_mouse_pos.1);
 
-            for y in start_y..=end_y {
-                gfx.draw_text(BLOCK_CHAR, start_x as usize, y as usize);
-                gfx.draw_text(BLOCK_CHAR, end_x as usize, y as usize);
-            }
-            gfx.draw_text(
-                &BLOCK_CHAR.repeat((end_x - start_x) as usize),
-                start_x as usize,
-                start_y as usize,
-            );
-            gfx.draw_text(
-                &BLOCK_CHAR.repeat((end_x - start_x) as usize),
-                start_x as usize,
-                end_y as usize,
-            );
+            match draw_action.mode {
+                DrawMode::Rect => {
+                    for y in start_y..=end_y {
+                        gfx.draw_text(BLOCK_CHAR, start_x as usize, y as usize);
+                        gfx.draw_text(BLOCK_CHAR, end_x as usize, y as usize);
+                    }
+                    gfx.draw_text(
+                        &BLOCK_CHAR.repeat((end_x - start_x) as usize),
+                        start_x as usize,
+                        start_y as usize,
+                    );
+                    gfx.draw_text(
+                        &BLOCK_CHAR.repeat((end_x - start_x) as usize),
+                        start_x as usize,
+                        end_y as usize,
+                    );
+                }
+                DrawMode::Line => {
+                    let diff_x = end_x - start_x;
+                    let diff_y = end_y - start_y;
+                    if diff_x >= diff_y {
+                        for y in start_y..=end_y {}
+                    }
+                }
+                _ => unreachable!("Draw action cannot be nothing"),
+            };
         }
     }
 
@@ -92,6 +104,15 @@ impl terge::App for App {
                     }
                     if mouse_event.kind == MouseEventKind::Up(MouseButton::Left) {
                         self.end_draw_mode();
+                    }
+                }
+                Event::Key(key_event) => {
+                    if key_event.is_press() {
+                        match key_event.code {
+                            KeyCode::Char('r') => self.draw_mode_indent = DrawMode::Rect,
+                            KeyCode::Char('l') => self.draw_mode_indent = DrawMode::Line,
+                            _ => {}
+                        }
                     }
                 }
                 _ => {}
