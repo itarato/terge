@@ -1,6 +1,6 @@
 use crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind};
 use log::{error, info};
-use terge::Terge;
+use terge::{Gfx, Terge};
 
 type I32Point = (i32, i32);
 const BLOCK_CHAR: &'static str = "█";
@@ -15,6 +15,59 @@ enum DrawMode {
 struct DrawAction {
     mode: DrawMode,
     start: I32Point,
+}
+
+fn point_pair_minmax(lhs: I32Point, rhs: I32Point) -> (i32, i32, i32, i32) {
+    (
+        lhs.0.min(rhs.0),
+        lhs.1.min(rhs.1),
+        lhs.0.max(rhs.0),
+        lhs.1.max(rhs.1),
+    )
+}
+
+fn draw_rect(gfx: &mut Gfx, start: I32Point, end: I32Point) {
+    let (x_min, y_min, x_max, y_max) = point_pair_minmax(start, end);
+
+    for y in y_min..=y_max {
+        gfx.draw_text(BLOCK_CHAR, x_min as usize, y as usize);
+        gfx.draw_text(BLOCK_CHAR, x_max as usize, y as usize);
+    }
+    gfx.draw_text(
+        &BLOCK_CHAR.repeat((x_max - x_min) as usize),
+        x_min as usize,
+        y_min as usize,
+    );
+    gfx.draw_text(
+        &BLOCK_CHAR.repeat((x_max - x_min) as usize),
+        x_min as usize,
+        y_max as usize,
+    );
+}
+
+fn draw_line(gfx: &mut Gfx, start: I32Point, end: I32Point) {
+    let (x_min, y_min, x_max, y_max) = point_pair_minmax(start, end);
+
+    let diff_x = (end.0 - start.0) as f32;
+    let diff_y = (end.1 - start.1) as f32;
+    let diff_x_abs = diff_x.abs();
+    let diff_y_abs = diff_y.abs();
+
+    if diff_x_abs >= diff_y_abs {
+        if diff_x != 0.0 {
+            for x in x_min..=x_max {
+                let y = ((diff_y / diff_x) * (x as f32 - start.0 as f32) + start.1 as f32) as usize;
+                gfx.draw_text(BLOCK_CHAR, x as usize, y);
+            }
+        }
+    } else {
+        if diff_y != 0.0 {
+            for y in y_min..=y_max {
+                let x = ((diff_x / diff_y) * (y as f32 - start.1 as f32) + start.0 as f32) as usize;
+                gfx.draw_text(BLOCK_CHAR, x, y as usize);
+            }
+        }
+    }
 }
 
 struct App {
@@ -59,59 +112,9 @@ impl terge::App for App {
         gfx.clear_screen();
 
         if let Some(draw_action) = &self.draw_mode_details {
-            let start_x = draw_action.start.0;
-            let start_y = draw_action.start.1;
-            let end_x = self.current_mouse_pos.0;
-            let end_y = self.current_mouse_pos.1;
-
-            let x_min = start_x.min(end_x);
-            let x_max = start_x.max(end_x);
-            let y_min = start_y.min(end_y);
-            let y_max = start_y.max(end_y);
-
             match draw_action.mode {
-                DrawMode::Rect => {
-                    for y in y_min..=y_max {
-                        gfx.draw_text(BLOCK_CHAR, x_min as usize, y as usize);
-                        gfx.draw_text(BLOCK_CHAR, x_max as usize, y as usize);
-                    }
-                    gfx.draw_text(
-                        &BLOCK_CHAR.repeat((x_max - x_min) as usize),
-                        x_min as usize,
-                        y_min as usize,
-                    );
-                    gfx.draw_text(
-                        &BLOCK_CHAR.repeat((x_max - x_min) as usize),
-                        x_min as usize,
-                        y_max as usize,
-                    );
-                }
-                DrawMode::Line => {
-                    let diff_x = (end_x - start_x) as f32;
-                    let diff_y = (end_y - start_y) as f32;
-                    let diff_x_abs = diff_x.abs();
-                    let diff_y_abs = diff_y.abs();
-
-                    if diff_x_abs >= diff_y_abs {
-                        if diff_x != 0.0 {
-                            for x in x_min..=x_max {
-                                let y = ((diff_y / diff_x) * (x as f32 - start_x as f32)
-                                    + start_y as f32)
-                                    as usize;
-                                gfx.draw_text(BLOCK_CHAR, x as usize, y);
-                            }
-                        }
-                    } else {
-                        if diff_y != 0.0 {
-                            for y in y_min..=y_max {
-                                let x = ((diff_x / diff_y) * (y as f32 - start_y as f32)
-                                    + start_x as f32)
-                                    as usize;
-                                gfx.draw_text(BLOCK_CHAR, x, y as usize);
-                            }
-                        }
-                    }
-                }
+                DrawMode::Rect => draw_rect(gfx, draw_action.start, self.current_mouse_pos),
+                DrawMode::Line => draw_line(gfx, draw_action.start, self.current_mouse_pos),
                 _ => unreachable!("Draw action cannot be nothing"),
             };
         }
