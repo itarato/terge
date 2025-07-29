@@ -85,7 +85,7 @@ impl terge::App for App {
                     let diff_x = end_x - start_x;
                     let diff_y = end_y - start_y;
                     if diff_x >= diff_y {
-                        for y in start_y..=end_y {}
+                        for x in start_x..=end_x {}
                     }
                 }
                 _ => unreachable!("Draw action cannot be nothing"),
@@ -93,9 +93,9 @@ impl terge::App for App {
         }
     }
 
-    fn reset(&mut self, gfx: &mut terge::Gfx) {}
+    fn reset(&mut self, _gfx: &mut terge::Gfx) {}
 
-    fn update(&mut self, events: &terge::EventGroup, gfx: &mut terge::Gfx) -> bool {
+    fn update(&mut self, events: &terge::EventGroup, _gfx: &mut terge::Gfx) -> bool {
         for e in &events.events {
             match e {
                 Event::Mouse(mouse_event) => {

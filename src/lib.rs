@@ -7,7 +7,7 @@ use std::{
 
 use crossterm::{
     ExecutableCommand, cursor,
-    event::{self, Event, KeyCode, KeyEvent, MouseEvent, MouseEventKind, poll, read},
+    event::{self, Event, KeyCode, KeyEvent, poll, read},
     terminal,
 };
 use log::debug;
