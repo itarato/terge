@@ -1,10 +1,11 @@
-use crossterm::event::Event;
-use terge::{Gfx, Terge};
+use log::debug;
+use terge::{EventGroup, Gfx, Terge};
 
 struct App {
     counter: u64,
     fps: u64,
     timestamp: u64,
+    ch: Option<char>,
 }
 
 fn get_timestamp() -> u64 {
@@ -20,6 +21,7 @@ impl App {
             counter: 0,
             fps: 0,
             timestamp: get_timestamp(),
+            ch: None,
         }
     }
 }
@@ -32,15 +34,16 @@ impl terge::App for App {
             gfx.width / 2 - 4,
             gfx.height / 2,
         );
+
+        if let Some(ch) = self.ch {
+            debug!("Print char: {}", ch);
+            gfx.draw_text(&ch.to_string(), gfx.width / 2, gfx.height / 2 + 2);
+        } else {
+            debug!("NO CHAR");
+        }
     }
 
-    fn update(&mut self, event: Option<Event>, gfx: &mut Gfx) -> bool {
-        if let Some(event) = event {
-            match event {
-                _ => {}
-            }
-        }
-
+    fn update(&mut self, events: &EventGroup, _gfx: &mut Gfx) -> bool {
         let new_timestamp = get_timestamp();
 
         if new_timestamp > self.timestamp {
@@ -51,15 +54,19 @@ impl terge::App for App {
             self.counter += 1;
         }
 
+        self.ch = events.first_pressed_char();
+
         true
     }
 
-    fn reset(&mut self, gfx: &mut Gfx) {
+    fn reset(&mut self, _gfx: &mut Gfx) {
         self.counter = 0;
     }
 }
 
 fn main() {
+    pretty_env_logger::init();
+
     let mut engine = Terge::new(Box::new(App::new()));
     engine.set_target_fps(120);
     engine.run();

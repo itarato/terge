@@ -1,11 +1,69 @@
-use std::{io::Write, time::Duration};
+use std::{
+    io::{self, Write},
+    sync::{Arc, atomic::AtomicBool, mpsc},
+    thread,
+    time::Duration,
+};
 
-use crossterm::event::{Event, KeyCode, poll, read};
+use crossterm::{
+    ExecutableCommand, cursor,
+    event::{self, Event, KeyCode, KeyEvent, MouseEvent, MouseEventKind, poll, read},
+    terminal,
+};
+use log::debug;
 
 pub trait App {
     fn reset(&mut self, gfx: &mut Gfx);
-    fn update(&mut self, event: Option<Event>, gfx: &mut Gfx) -> bool;
+    fn update(&mut self, events: &EventGroup, gfx: &mut Gfx) -> bool;
     fn draw(&self, gfx: &mut Gfx);
+}
+
+#[derive(Debug, Default)]
+pub struct EventGroup {
+    pub events: Vec<Event>,
+}
+
+impl EventGroup {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn first_pressed_char(&self) -> Option<char> {
+        for e in &self.events {
+            match e {
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char(c),
+                    ..
+                }) => return Some(*c),
+                _ => {}
+            }
+        }
+        None
+    }
+
+    pub fn did_press_key(&self, key_code: KeyCode) -> bool {
+        for e in &self.events {
+            match e {
+                Event::Key(key_event) => {
+                    if key_event.code == key_code {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
+    pub fn last_mouse_pos(&self) -> Option<(u16, u16)> {
+        for e in self.events.iter().rev() {
+            match e {
+                Event::Mouse(mouse_event) => return Some((mouse_event.column, mouse_event.row)),
+                _ => {}
+            }
+        }
+        None
+    }
 }
 
 pub struct Gfx {
@@ -29,7 +87,10 @@ impl Gfx {
     }
 
     pub fn clear_screen(&self) {
-        print!("\x1B[2J\x1B[H");
+        io::stdout()
+            .execute(terminal::Clear(terminal::ClearType::All))
+            .expect("Failed cleaning terminal");
+        self.flush_buffer();
     }
 
     fn draw_pos(&self, x: usize, y: usize) {
@@ -72,10 +133,22 @@ impl Terge {
 
     fn turn_on_terminal_raw_mode(&self) {
         crossterm::terminal::enable_raw_mode().expect("Failed to enable raw mode");
+        io::stdout()
+            .execute(cursor::Hide)
+            .expect("Failed running crossterm commands");
+        io::stdout()
+            .execute(event::EnableMouseCapture)
+            .expect("Failed enabling mouse capture");
     }
 
     fn turn_off_terminal_raw_mode(&self) {
         crossterm::terminal::disable_raw_mode().expect("Failed to disable raw mode");
+        io::stdout()
+            .execute(cursor::Show)
+            .expect("Failed running crossterm commands");
+        io::stdout()
+            .execute(event::DisableMouseCapture)
+            .expect("Failed enabling mouse capture");
     }
 
     pub fn run(&mut self) {
@@ -85,32 +158,52 @@ impl Terge {
 
         let mut frame_start_ms;
 
+        let (ch_writer, ch_reader) = mpsc::channel::<Event>();
+        let event_thread_should_finish = Arc::new(AtomicBool::new(false));
+
+        let event_thread = thread::spawn({
+            let event_thread_should_finish = event_thread_should_finish.clone();
+
+            move || {
+                while !event_thread_should_finish.load(std::sync::atomic::Ordering::Acquire) {
+                    if poll(Duration::from_millis(1)).expect("Failed polling for events") {
+                        let event = read().expect("Failed reading event.");
+
+                        debug!("Event: {:?}", event);
+
+                        ch_writer.send(event).expect("Failed sending event.");
+                    }
+                }
+            }
+        });
+
+        let mut events = EventGroup::new();
+
         while !self.should_terminate {
             frame_start_ms = get_current_ms();
 
-            let event = if poll(Duration::from_millis(1)).expect("Failed polling events") {
-                read()
-                    .map(|event| {
-                        match event {
-                            Event::Key(key_event) => {
-                                if key_event.code == KeyCode::Esc {
-                                    self.should_terminate = true;
-                                }
-                            }
-                            Event::Resize(width, height) => {
-                                self.gfx.width = width as usize;
-                                self.gfx.height = height as usize;
-                            }
-                            _ => {}
-                        }
-                        event
-                    })
-                    .ok()
-            } else {
-                None
-            };
+            let mut new_events = vec![];
+            while let Ok(e) = ch_reader.try_recv() {
+                new_events.push(e);
+            }
+            events.events = new_events;
 
-            if !self.app.update(event, &mut self.gfx) {
+            for event in &events.events {
+                match event {
+                    Event::Key(key_event) => {
+                        if key_event.code == KeyCode::Esc {
+                            self.should_terminate = true;
+                        }
+                    }
+                    Event::Resize(width, height) => {
+                        self.gfx.width = *width as usize;
+                        self.gfx.height = *height as usize;
+                    }
+                    _ => {}
+                }
+            }
+
+            if !self.app.update(&events, &mut self.gfx) {
                 self.should_terminate = true;
             }
             self.app.draw(&mut self.gfx);
@@ -126,6 +219,9 @@ impl Terge {
                 ));
             }
         }
+
+        event_thread_should_finish.store(true, std::sync::atomic::Ordering::Release);
+        event_thread.join().expect("Failed joining event thread");
     }
 
     pub fn set_target_fps(&mut self, target_fps: u128) {
@@ -145,5 +241,5 @@ impl Drop for Terge {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
 }

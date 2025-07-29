@@ -1,5 +1,4 @@
-use crossterm::event::{Event, KeyCode};
-use terge::{Gfx, Terge};
+use terge::{EventGroup, Gfx, Terge};
 
 #[derive(Debug, Default)]
 struct Coord {
@@ -28,19 +27,9 @@ impl terge::App for App {
         gfx.draw_text("O", self.ball_pos.x as usize, self.ball_pos.y as usize);
     }
 
-    fn update(&mut self, event: Option<Event>, gfx: &mut Gfx) -> bool {
-        if let Some(event) = event {
-            match event {
-                Event::Key(key_event) => {
-                    if key_event.code == KeyCode::Left {
-                        self.pad_x -= 1;
-                    }
-                    if key_event.code == KeyCode::Right {
-                        self.pad_x += 1;
-                    }
-                }
-                _ => {}
-            }
+    fn update(&mut self, events: &EventGroup, gfx: &mut Gfx) -> bool {
+        if let Some((x, _y)) = events.last_mouse_pos() {
+            self.pad_x = x as i32;
         }
 
         let ball_next_x = self.ball_pos.x + self.ball_v.x;
@@ -69,7 +58,9 @@ impl terge::App for App {
 }
 
 fn main() {
+    pretty_env_logger::init();
+
     let mut engine = Terge::new(Box::new(App::new()));
-    engine.set_target_fps(30);
+    engine.set_target_fps(60);
     engine.run();
 }
