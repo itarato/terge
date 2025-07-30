@@ -6,6 +6,44 @@ use terge::{Arithmetics, I32Point, Line, Rect, Terge};
 
 type IdType = u64;
 
+struct RectObject {
+    id: IdType,
+    rect: Rect,
+}
+
+impl RectObject {
+    fn new(id: IdType, rect: Rect) -> Self {
+        Self { id, rect }
+    }
+}
+
+struct LineObject {
+    id: IdType,
+    line: Line,
+    start_anchor_rect_id: Option<IdType>,
+    end_anchor_rect_id: Option<IdType>,
+}
+
+impl LineObject {
+    fn new(id: IdType, line: Line) -> Self {
+        Self::new_with_anchors(id, line, None, None)
+    }
+
+    fn new_with_anchors(
+        id: IdType,
+        line: Line,
+        start_anchor_rect_id: Option<IdType>,
+        end_anchor_rect_id: Option<IdType>,
+    ) -> Self {
+        Self {
+            id,
+            line,
+            start_anchor_rect_id,
+            end_anchor_rect_id,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum DrawIntent {
     Line,
@@ -30,8 +68,8 @@ struct App {
     action: Option<Action>,
     draw_mode_indent: DrawIntent,
     current_mouse_pos: I32Point,
-    rectangles: HashMap<IdType, Rect>,
-    lines: HashMap<IdType, Line>,
+    rectangles: HashMap<IdType, RectObject>,
+    lines: HashMap<IdType, LineObject>,
 }
 
 impl App {
@@ -68,19 +106,35 @@ impl App {
             match action {
                 Action::Line { start } => {
                     let new_id = self.get_id();
+
+                    let start_anchor_rect_id = self
+                        .rectangle_under_point(start)
+                        .map(|rect_obj| rect_obj.id);
+                    let end_anchor_rect_id = self
+                        .rectangle_under_point(self.current_mouse_pos)
+                        .map(|rect_obj| rect_obj.id);
+
                     self.lines.insert(
                         new_id,
-                        Line {
-                            start,
-                            end: self.current_mouse_pos,
-                        },
+                        LineObject::new_with_anchors(
+                            new_id,
+                            Line {
+                                start,
+                                end: self.current_mouse_pos,
+                            },
+                            start_anchor_rect_id,
+                            end_anchor_rect_id,
+                        ),
                     );
                 }
                 Action::Rect { start } => {
                     let new_id = self.get_id();
                     self.rectangles.insert(
                         new_id,
-                        Rect::new_from_unordered_points(start, self.current_mouse_pos),
+                        RectObject::new(
+                            new_id,
+                            Rect::new_from_unordered_points(start, self.current_mouse_pos),
+                        ),
                     );
                 }
                 _ => {}
@@ -88,10 +142,20 @@ impl App {
         }
     }
 
-    fn rectangle_under_cursor(&self) -> Option<(IdType, &Rect)> {
-        for (id, rect) in &self.rectangles {
-            if rect.point_on_header(self.current_mouse_pos) {
-                return Some((*id, rect));
+    fn rectangle_header_under_point(&self, p: I32Point) -> Option<&RectObject> {
+        for (_id, rect_obj) in &self.rectangles {
+            if rect_obj.rect.is_point_on_header(p) {
+                return Some(rect_obj);
+            }
+        }
+
+        None
+    }
+
+    fn rectangle_under_point(&self, p: I32Point) -> Option<&RectObject> {
+        for (_id, rect_obj) in &self.rectangles {
+            if rect_obj.rect.is_point_on(p) {
+                return Some(rect_obj);
             }
         }
 
@@ -103,17 +167,28 @@ impl terge::App for App {
     fn draw(&self, gfx: &mut terge::Gfx) {
         gfx.clear_screen();
 
-        for (_id, rect) in &self.rectangles {
-            gfx.draw_rect(rect);
+        for (_id, rect_obj) in &self.rectangles {
+            gfx.draw_rect(&rect_obj.rect);
         }
-        for (_id, line) in &self.lines {
-            gfx.draw_line(line.start, line.end);
+        for (_id, line_obj) in &self.lines {
+            let line_start = line_obj
+                .start_anchor_rect_id
+                .and_then(|rect_id| self.rectangles.get(&rect_id))
+                .map(|rect_obj| rect_obj.rect.midpoint())
+                .unwrap_or(line_obj.line.start);
+            let line_end = line_obj
+                .end_anchor_rect_id
+                .and_then(|rect_id| self.rectangles.get(&rect_id))
+                .map(|rect_obj| rect_obj.rect.midpoint())
+                .unwrap_or(line_obj.line.end);
+
+            gfx.draw_line_from_points(line_start, line_end);
         }
 
         if let Some(draw_action) = &self.action {
             match draw_action {
                 Action::Rect { start } => gfx.draw_rect_from_points(*start, self.current_mouse_pos),
-                Action::Line { start } => gfx.draw_line(*start, self.current_mouse_pos),
+                Action::Line { start } => gfx.draw_line_from_points(*start, self.current_mouse_pos),
                 _ => {}
             };
         }
@@ -131,10 +206,12 @@ impl terge::App for App {
             match e {
                 Event::Mouse(mouse_event) => {
                     if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
-                        if let Some((rectangle_id, rect)) = self.rectangle_under_cursor() {
+                        if let Some(rect_obj) =
+                            self.rectangle_header_under_point(self.current_mouse_pos)
+                        {
                             self.action = Some(Action::DragAndDrop {
-                                rectangle_id,
-                                offset: self.current_mouse_pos.sub(rect.start),
+                                rectangle_id: rect_obj.id,
+                                offset: self.current_mouse_pos.sub(rect_obj.rect.start),
                             });
                         } else {
                             self.start_draw_mode((
@@ -167,7 +244,7 @@ impl terge::App for App {
         {
             self.rectangles
                 .get_mut(&rectangle_id)
-                .map(|rect| rect.start = self.current_mouse_pos.sub(offset));
+                .map(|rect_obj| rect_obj.rect.start = self.current_mouse_pos.sub(offset));
         }
 
         true
