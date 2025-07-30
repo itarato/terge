@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+
 use crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind};
 use log::{error, info};
 use terge::{I32Point, Terge};
+
+type IdType = u64;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum DrawMode {
@@ -25,22 +29,29 @@ struct Line {
 }
 
 struct App {
+    id_provider: u64,
     draw_mode_details: Option<DrawAction>,
     draw_mode_indent: DrawMode,
     current_mouse_pos: I32Point,
-    rectangles: Vec<Rect>,
-    lines: Vec<Line>,
+    rectangles: HashMap<IdType, Rect>,
+    lines: HashMap<IdType, Line>,
 }
 
 impl App {
     fn new() -> Self {
         Self {
+            id_provider: 0,
             draw_mode_details: None,
             draw_mode_indent: DrawMode::Rect,
             current_mouse_pos: (-1, -1),
-            rectangles: vec![],
-            lines: vec![],
+            rectangles: HashMap::new(),
+            lines: HashMap::new(),
         }
+    }
+
+    fn get_id(&mut self) -> u64 {
+        self.id_provider += 1;
+        self.id_provider
     }
 
     fn start_draw_mode(&mut self, start: I32Point) {
@@ -61,26 +72,31 @@ impl App {
     }
 
     fn end_draw_mode(&mut self) {
-        match &self.draw_mode_details {
-            None => {}
-            Some(action) => match action.mode {
+        if let Some(action) = self.draw_mode_details.take() {
+            match action.mode {
                 DrawMode::Line => {
-                    self.lines.push(Line {
-                        start: action.start,
-                        end: self.current_mouse_pos,
-                    });
+                    let new_id = self.get_id();
+                    self.lines.insert(
+                        new_id,
+                        Line {
+                            start: action.start,
+                            end: self.current_mouse_pos,
+                        },
+                    );
                 }
                 DrawMode::Rect => {
-                    self.rectangles.push(Rect {
-                        start: action.start,
-                        end: self.current_mouse_pos,
-                    });
+                    let new_id = self.get_id();
+                    self.rectangles.insert(
+                        new_id,
+                        Rect {
+                            start: action.start,
+                            end: self.current_mouse_pos,
+                        },
+                    );
                 }
                 _ => {}
-            },
-        };
-
-        self.draw_mode_details = None;
+            }
+        }
     }
 }
 
@@ -88,10 +104,10 @@ impl terge::App for App {
     fn draw(&self, gfx: &mut terge::Gfx) {
         gfx.clear_screen();
 
-        for rect in &self.rectangles {
+        for (_id, rect) in &self.rectangles {
             gfx.draw_rect(rect.start, rect.end);
         }
-        for line in &self.lines {
+        for (_id, line) in &self.lines {
             gfx.draw_line(line.start, line.end);
         }
 
