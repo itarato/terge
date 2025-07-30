@@ -7,17 +7,19 @@ use terge::{I32Point, Terge};
 type IdType = u64;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum DrawMode {
-    Nothing,
+enum DrawIntent {
     Line,
     Rect,
 }
 
-struct DrawAction {
-    mode: DrawMode,
-    start: I32Point,
+enum DrawAction {
+    Line { start: I32Point },
+    Rect { start: I32Point },
+    DragAndDrop { rectangle_id: IdType },
 }
 
+// TODO: Add color
+// TODO: Add hover-over highlight
 struct Rect {
     start: I32Point,
     end: I32Point,
@@ -31,7 +33,7 @@ struct Line {
 struct App {
     id_provider: u64,
     draw_mode_details: Option<DrawAction>,
-    draw_mode_indent: DrawMode,
+    draw_mode_indent: DrawIntent,
     current_mouse_pos: I32Point,
     rectangles: HashMap<IdType, Rect>,
     lines: HashMap<IdType, Line>,
@@ -42,7 +44,7 @@ impl App {
         Self {
             id_provider: 0,
             draw_mode_details: None,
-            draw_mode_indent: DrawMode::Rect,
+            draw_mode_indent: DrawIntent::Rect,
             current_mouse_pos: (-1, -1),
             rectangles: HashMap::new(),
             lines: HashMap::new(),
@@ -60,36 +62,31 @@ impl App {
             return;
         }
 
-        if self.draw_mode_indent == DrawMode::Nothing {
-            info!("Rejecting draw mode - no intent.");
-            return;
+        match self.draw_mode_indent {
+            DrawIntent::Line => self.draw_mode_details = Some(DrawAction::Line { start }),
+            DrawIntent::Rect => self.draw_mode_details = Some(DrawAction::Rect { start }),
         }
-
-        self.draw_mode_details = Some(DrawAction {
-            mode: self.draw_mode_indent,
-            start,
-        });
     }
 
     fn end_draw_mode(&mut self) {
         if let Some(action) = self.draw_mode_details.take() {
-            match action.mode {
-                DrawMode::Line => {
+            match action {
+                DrawAction::Line { start } => {
                     let new_id = self.get_id();
                     self.lines.insert(
                         new_id,
                         Line {
-                            start: action.start,
+                            start,
                             end: self.current_mouse_pos,
                         },
                     );
                 }
-                DrawMode::Rect => {
+                DrawAction::Rect { start } => {
                     let new_id = self.get_id();
                     self.rectangles.insert(
                         new_id,
                         Rect {
-                            start: action.start,
+                            start,
                             end: self.current_mouse_pos,
                         },
                     );
@@ -112,9 +109,9 @@ impl terge::App for App {
         }
 
         if let Some(draw_action) = &self.draw_mode_details {
-            match draw_action.mode {
-                DrawMode::Rect => gfx.draw_rect(draw_action.start, self.current_mouse_pos),
-                DrawMode::Line => gfx.draw_line(draw_action.start, self.current_mouse_pos),
+            match draw_action {
+                DrawAction::Rect { start } => gfx.draw_rect(*start, self.current_mouse_pos),
+                DrawAction::Line { start } => gfx.draw_line(*start, self.current_mouse_pos),
                 _ => unreachable!("Draw action cannot be nothing"),
             };
         }
@@ -141,8 +138,8 @@ impl terge::App for App {
                 Event::Key(key_event) => {
                     if key_event.is_press() {
                         match key_event.code {
-                            KeyCode::Char('r') => self.draw_mode_indent = DrawMode::Rect,
-                            KeyCode::Char('l') => self.draw_mode_indent = DrawMode::Line,
+                            KeyCode::Char('r') => self.draw_mode_indent = DrawIntent::Rect,
+                            KeyCode::Char('l') => self.draw_mode_indent = DrawIntent::Line,
                             _ => {}
                         }
                     }
