@@ -16,6 +16,47 @@ pub const BLOCK_CHAR: &'static str = "█";
 
 pub type I32Point = (i32, i32);
 
+pub trait Arithmetics<T> {
+    fn add(&self, other: T) -> T;
+    fn sub(&self, other: T) -> T;
+}
+
+impl Arithmetics<I32Point> for I32Point {
+    fn add(&self, other: I32Point) -> I32Point {
+        (self.0 + other.0, self.1 + other.1)
+    }
+
+    fn sub(&self, other: I32Point) -> I32Point {
+        (self.0 - other.0, self.1 - other.1)
+    }
+}
+
+// TODO: Add color
+// TODO: Add hover-over highlight
+pub struct Rect {
+    pub start: I32Point,
+    pub size: I32Point,
+}
+
+impl Rect {
+    pub fn new_from_unordered_points(lhs: I32Point, rhs: I32Point) -> Self {
+        let (min_x, min_y, max_x, max_y) = Gfx::point_pair_minmax(lhs, rhs);
+        Self {
+            start: (min_x, min_y),
+            size: (max_x - min_x, max_y - min_y),
+        }
+    }
+
+    pub fn point_on_header(&self, p: I32Point) -> bool {
+        p.1 == self.start.1 && p.0 >= self.start.0 && p.0 <= (self.start.0 + self.size.0)
+    }
+}
+
+pub struct Line {
+    pub start: I32Point,
+    pub end: I32Point,
+}
+
 pub trait App {
     fn reset(&mut self, gfx: &mut Gfx);
     fn update(&mut self, events: &EventGroup, gfx: &mut Gfx) -> bool;
@@ -110,8 +151,12 @@ impl Gfx {
         std::io::stdout().flush().expect("Failed flushing STDOUT");
     }
 
-    pub fn draw_rect(&self, start: I32Point, end: I32Point) {
-        let (x_min, y_min, x_max, y_max) = Gfx::point_pair_minmax(start, end);
+    pub fn draw_rect(&self, rect: &Rect) {
+        self.draw_rect_from_points(rect.start, rect.start.add(rect.size));
+    }
+
+    pub fn draw_rect_from_points(&self, lhs: I32Point, rhs: I32Point) {
+        let (x_min, y_min, x_max, y_max) = Gfx::point_pair_minmax(lhs, rhs);
 
         for y in y_min..=y_max {
             self.draw_text(BLOCK_CHAR, x_min as usize, y as usize);

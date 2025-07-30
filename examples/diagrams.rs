@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind};
-use log::{error, info};
-use terge::{I32Point, Terge};
+use log::error;
+use terge::{Arithmetics, I32Point, Line, Rect, Terge};
 
 type IdType = u64;
 
@@ -12,27 +12,22 @@ enum DrawIntent {
     Rect,
 }
 
-enum DrawAction {
-    Line { start: I32Point },
-    Rect { start: I32Point },
-    DragAndDrop { rectangle_id: IdType },
-}
-
-// TODO: Add color
-// TODO: Add hover-over highlight
-struct Rect {
-    start: I32Point,
-    end: I32Point,
-}
-
-struct Line {
-    start: I32Point,
-    end: I32Point,
+enum Action {
+    Line {
+        start: I32Point,
+    },
+    Rect {
+        start: I32Point,
+    },
+    DragAndDrop {
+        rectangle_id: IdType,
+        offset: I32Point,
+    },
 }
 
 struct App {
     id_provider: u64,
-    draw_mode_details: Option<DrawAction>,
+    action: Option<Action>,
     draw_mode_indent: DrawIntent,
     current_mouse_pos: I32Point,
     rectangles: HashMap<IdType, Rect>,
@@ -43,7 +38,7 @@ impl App {
     fn new() -> Self {
         Self {
             id_provider: 0,
-            draw_mode_details: None,
+            action: None,
             draw_mode_indent: DrawIntent::Rect,
             current_mouse_pos: (-1, -1),
             rectangles: HashMap::new(),
@@ -57,21 +52,21 @@ impl App {
     }
 
     fn start_draw_mode(&mut self, start: I32Point) {
-        if self.draw_mode_details.is_some() {
+        if self.action.is_some() {
             error!("Starting draw mode when there is already one.");
             return;
         }
 
         match self.draw_mode_indent {
-            DrawIntent::Line => self.draw_mode_details = Some(DrawAction::Line { start }),
-            DrawIntent::Rect => self.draw_mode_details = Some(DrawAction::Rect { start }),
+            DrawIntent::Line => self.action = Some(Action::Line { start }),
+            DrawIntent::Rect => self.action = Some(Action::Rect { start }),
         }
     }
 
     fn end_draw_mode(&mut self) {
-        if let Some(action) = self.draw_mode_details.take() {
+        if let Some(action) = self.action.take() {
             match action {
-                DrawAction::Line { start } => {
+                Action::Line { start } => {
                     let new_id = self.get_id();
                     self.lines.insert(
                         new_id,
@@ -81,19 +76,26 @@ impl App {
                         },
                     );
                 }
-                DrawAction::Rect { start } => {
+                Action::Rect { start } => {
                     let new_id = self.get_id();
                     self.rectangles.insert(
                         new_id,
-                        Rect {
-                            start,
-                            end: self.current_mouse_pos,
-                        },
+                        Rect::new_from_unordered_points(start, self.current_mouse_pos),
                     );
                 }
                 _ => {}
             }
         }
+    }
+
+    fn rectangle_under_cursor(&self) -> Option<(IdType, &Rect)> {
+        for (id, rect) in &self.rectangles {
+            if rect.point_on_header(self.current_mouse_pos) {
+                return Some((*id, rect));
+            }
+        }
+
+        None
     }
 }
 
@@ -102,17 +104,17 @@ impl terge::App for App {
         gfx.clear_screen();
 
         for (_id, rect) in &self.rectangles {
-            gfx.draw_rect(rect.start, rect.end);
+            gfx.draw_rect(rect);
         }
         for (_id, line) in &self.lines {
             gfx.draw_line(line.start, line.end);
         }
 
-        if let Some(draw_action) = &self.draw_mode_details {
+        if let Some(draw_action) = &self.action {
             match draw_action {
-                DrawAction::Rect { start } => gfx.draw_rect(*start, self.current_mouse_pos),
-                DrawAction::Line { start } => gfx.draw_line(*start, self.current_mouse_pos),
-                _ => unreachable!("Draw action cannot be nothing"),
+                Action::Rect { start } => gfx.draw_rect_from_points(*start, self.current_mouse_pos),
+                Action::Line { start } => gfx.draw_line(*start, self.current_mouse_pos),
+                _ => {}
             };
         }
     }
@@ -129,7 +131,17 @@ impl terge::App for App {
             match e {
                 Event::Mouse(mouse_event) => {
                     if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
-                        self.start_draw_mode((mouse_event.column as i32, mouse_event.row as i32));
+                        if let Some((rectangle_id, rect)) = self.rectangle_under_cursor() {
+                            self.action = Some(Action::DragAndDrop {
+                                rectangle_id,
+                                offset: self.current_mouse_pos.sub(rect.start),
+                            });
+                        } else {
+                            self.start_draw_mode((
+                                mouse_event.column as i32,
+                                mouse_event.row as i32,
+                            ));
+                        }
                     }
                     if mouse_event.kind == MouseEventKind::Up(MouseButton::Left) {
                         self.end_draw_mode();
@@ -146,6 +158,16 @@ impl terge::App for App {
                 }
                 _ => {}
             }
+        }
+
+        if let Some(Action::DragAndDrop {
+            rectangle_id,
+            offset,
+        }) = self.action
+        {
+            self.rectangles
+                .get_mut(&rectangle_id)
+                .map(|rect| rect.start = self.current_mouse_pos.sub(offset));
         }
 
         true
