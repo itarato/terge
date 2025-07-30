@@ -12,6 +12,10 @@ use crossterm::{
 };
 use log::trace;
 
+pub const BLOCK_CHAR: &'static str = "█";
+
+pub type I32Point = (i32, i32);
+
 pub trait App {
     fn reset(&mut self, gfx: &mut Gfx);
     fn update(&mut self, events: &EventGroup, gfx: &mut Gfx) -> bool;
@@ -104,6 +108,61 @@ impl Gfx {
 
     fn flush_buffer(&self) {
         std::io::stdout().flush().expect("Failed flushing STDOUT");
+    }
+
+    pub fn draw_rect(&self, start: I32Point, end: I32Point) {
+        let (x_min, y_min, x_max, y_max) = Gfx::point_pair_minmax(start, end);
+
+        for y in y_min..=y_max {
+            self.draw_text(BLOCK_CHAR, x_min as usize, y as usize);
+            self.draw_text(BLOCK_CHAR, x_max as usize, y as usize);
+        }
+        self.draw_text(
+            &BLOCK_CHAR.repeat((x_max - x_min) as usize),
+            x_min as usize,
+            y_min as usize,
+        );
+        self.draw_text(
+            &BLOCK_CHAR.repeat((x_max - x_min) as usize),
+            x_min as usize,
+            y_max as usize,
+        );
+    }
+
+    pub fn draw_line(&self, start: I32Point, end: I32Point) {
+        let (x_min, y_min, x_max, y_max) = Gfx::point_pair_minmax(start, end);
+
+        let diff_x = (end.0 - start.0) as f32;
+        let diff_y = (end.1 - start.1) as f32;
+        let diff_x_abs = diff_x.abs();
+        let diff_y_abs = diff_y.abs();
+
+        if diff_x_abs >= diff_y_abs {
+            if diff_x != 0.0 {
+                for x in x_min..=x_max {
+                    let y =
+                        ((diff_y / diff_x) * (x as f32 - start.0 as f32) + start.1 as f32) as usize;
+                    self.draw_text(BLOCK_CHAR, x as usize, y);
+                }
+            }
+        } else {
+            if diff_y != 0.0 {
+                for y in y_min..=y_max {
+                    let x =
+                        ((diff_x / diff_y) * (y as f32 - start.1 as f32) + start.0 as f32) as usize;
+                    self.draw_text(BLOCK_CHAR, x, y as usize);
+                }
+            }
+        }
+    }
+
+    pub fn point_pair_minmax(lhs: I32Point, rhs: I32Point) -> (i32, i32, i32, i32) {
+        (
+            lhs.0.min(rhs.0),
+            lhs.1.min(rhs.1),
+            lhs.0.max(rhs.0),
+            lhs.1.max(rhs.1),
+        )
     }
 }
 

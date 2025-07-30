@@ -1,9 +1,6 @@
 use crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind};
 use log::{error, info};
-use terge::{Gfx, Terge};
-
-type I32Point = (i32, i32);
-const BLOCK_CHAR: &'static str = "█";
+use terge::{I32Point, Terge};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum DrawMode {
@@ -17,60 +14,12 @@ struct DrawAction {
     start: I32Point,
 }
 
-fn point_pair_minmax(lhs: I32Point, rhs: I32Point) -> (i32, i32, i32, i32) {
-    (
-        lhs.0.min(rhs.0),
-        lhs.1.min(rhs.1),
-        lhs.0.max(rhs.0),
-        lhs.1.max(rhs.1),
-    )
-}
-
-fn draw_rect(gfx: &mut Gfx, start: I32Point, end: I32Point) {
-    let (x_min, y_min, x_max, y_max) = point_pair_minmax(start, end);
-
-    for y in y_min..=y_max {
-        gfx.draw_text(BLOCK_CHAR, x_min as usize, y as usize);
-        gfx.draw_text(BLOCK_CHAR, x_max as usize, y as usize);
-    }
-    gfx.draw_text(
-        &BLOCK_CHAR.repeat((x_max - x_min) as usize),
-        x_min as usize,
-        y_min as usize,
-    );
-    gfx.draw_text(
-        &BLOCK_CHAR.repeat((x_max - x_min) as usize),
-        x_min as usize,
-        y_max as usize,
-    );
-}
-
-fn draw_line(gfx: &mut Gfx, start: I32Point, end: I32Point) {
-    let (x_min, y_min, x_max, y_max) = point_pair_minmax(start, end);
-
-    let diff_x = (end.0 - start.0) as f32;
-    let diff_y = (end.1 - start.1) as f32;
-    let diff_x_abs = diff_x.abs();
-    let diff_y_abs = diff_y.abs();
-
-    if diff_x_abs >= diff_y_abs {
-        if diff_x != 0.0 {
-            for x in x_min..=x_max {
-                let y = ((diff_y / diff_x) * (x as f32 - start.0 as f32) + start.1 as f32) as usize;
-                gfx.draw_text(BLOCK_CHAR, x as usize, y);
-            }
-        }
-    } else {
-        if diff_y != 0.0 {
-            for y in y_min..=y_max {
-                let x = ((diff_x / diff_y) * (y as f32 - start.1 as f32) + start.0 as f32) as usize;
-                gfx.draw_text(BLOCK_CHAR, x, y as usize);
-            }
-        }
-    }
-}
-
 struct Rect {
+    start: I32Point,
+    end: I32Point,
+}
+
+struct Line {
     start: I32Point,
     end: I32Point,
 }
@@ -80,6 +29,7 @@ struct App {
     draw_mode_indent: DrawMode,
     current_mouse_pos: I32Point,
     rectangles: Vec<Rect>,
+    lines: Vec<Line>,
 }
 
 impl App {
@@ -89,6 +39,7 @@ impl App {
             draw_mode_indent: DrawMode::Rect,
             current_mouse_pos: (-1, -1),
             rectangles: vec![],
+            lines: vec![],
         }
     }
 
@@ -112,7 +63,21 @@ impl App {
     fn end_draw_mode(&mut self) {
         match &self.draw_mode_details {
             None => {}
-            Some(action) => {}
+            Some(action) => match action.mode {
+                DrawMode::Line => {
+                    self.lines.push(Line {
+                        start: action.start,
+                        end: self.current_mouse_pos,
+                    });
+                }
+                DrawMode::Rect => {
+                    self.rectangles.push(Rect {
+                        start: action.start,
+                        end: self.current_mouse_pos,
+                    });
+                }
+                _ => {}
+            },
         };
 
         self.draw_mode_details = None;
@@ -123,10 +88,17 @@ impl terge::App for App {
     fn draw(&self, gfx: &mut terge::Gfx) {
         gfx.clear_screen();
 
+        for rect in &self.rectangles {
+            gfx.draw_rect(rect.start, rect.end);
+        }
+        for line in &self.lines {
+            gfx.draw_line(line.start, line.end);
+        }
+
         if let Some(draw_action) = &self.draw_mode_details {
             match draw_action.mode {
-                DrawMode::Rect => draw_rect(gfx, draw_action.start, self.current_mouse_pos),
-                DrawMode::Line => draw_line(gfx, draw_action.start, self.current_mouse_pos),
+                DrawMode::Rect => gfx.draw_rect(draw_action.start, self.current_mouse_pos),
+                DrawMode::Line => gfx.draw_line(draw_action.start, self.current_mouse_pos),
                 _ => unreachable!("Draw action cannot be nothing"),
             };
         }
@@ -135,6 +107,11 @@ impl terge::App for App {
     fn reset(&mut self, _gfx: &mut terge::Gfx) {}
 
     fn update(&mut self, events: &terge::EventGroup, _gfx: &mut terge::Gfx) -> bool {
+        if let Some(last_mouse_pos) = events.last_mouse_pos() {
+            self.current_mouse_pos.0 = last_mouse_pos.0 as i32;
+            self.current_mouse_pos.1 = last_mouse_pos.1 as i32;
+        }
+
         for e in &events.events {
             match e {
                 Event::Mouse(mouse_event) => {
@@ -156,11 +133,6 @@ impl terge::App for App {
                 }
                 _ => {}
             }
-        }
-
-        if let Some(last_mouse_pos) = events.last_mouse_pos() {
-            self.current_mouse_pos.0 = last_mouse_pos.0 as i32;
-            self.current_mouse_pos.1 = last_mouse_pos.1 as i32;
         }
 
         true
