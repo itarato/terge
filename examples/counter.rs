@@ -69,5 +69,6 @@ fn main() {
 
     let mut engine = Terge::new(Box::new(App::new()));
     engine.set_target_fps(120);
+    // engine.disable_fps();
     engine.run();
 }
