@@ -134,11 +134,11 @@ impl Line {
         dy as f32 / dx as f32
     }
 
-    fn x_range(&self) -> ops::RangeInclusive<i32> {
+    pub fn x_range(&self) -> ops::RangeInclusive<i32> {
         self.start.0.min(self.end.0)..=self.start.0.max(self.end.0)
     }
 
-    fn y_range(&self) -> ops::RangeInclusive<i32> {
+    pub fn y_range(&self) -> ops::RangeInclusive<i32> {
         self.start.1.min(self.end.1)..=self.start.1.max(self.end.1)
     }
 }

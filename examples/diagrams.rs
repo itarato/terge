@@ -6,6 +6,18 @@ use terge::{Arithmetics, I32Point, Line, Rect, Terge, intersection_of_rect_and_l
 
 type IdType = u64;
 
+fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Option<I32Point> {
+    let intersections = intersection_of_rect_and_line(rect, line);
+
+    for p in intersections {
+        if line.x_range().contains(&p.0) && line.y_range().contains(&p.1) {
+            return Some(p);
+        }
+    }
+
+    None
+}
+
 struct RectObject {
     id: IdType,
     rect: Rect,
@@ -173,26 +185,6 @@ impl terge::App for App {
 
         for (_id, line_obj) in &self.lines {
             gfx.draw_line(&line_obj.line);
-
-            if let Some(rect_obj) = line_obj
-                .start_anchor_rect_id
-                .and_then(|rect_id| self.rectangles.get(&rect_id))
-            {
-                let intersections = intersection_of_rect_and_line(&rect_obj.rect, &line_obj.line);
-                for intersection in intersections {
-                    gfx.draw_text("S", intersection.0 as usize, intersection.1 as usize);
-                }
-            }
-
-            if let Some(rect_obj) = line_obj
-                .end_anchor_rect_id
-                .and_then(|rect_id| self.rectangles.get(&rect_id))
-            {
-                let intersections = intersection_of_rect_and_line(&rect_obj.rect, &line_obj.line);
-                for intersection in intersections {
-                    gfx.draw_text("E", intersection.0 as usize, intersection.1 as usize);
-                }
-            }
         }
 
         if let Some(draw_action) = &self.action {
@@ -263,6 +255,11 @@ impl terge::App for App {
                 .and_then(|rect_id| self.rectangles.get(&rect_id))
             {
                 line_obj.line.start = rect_obj.rect.midpoint();
+                if let Some(intersection) =
+                    intersection_of_rect_and_anchored_line(&rect_obj.rect, &line_obj.line)
+                {
+                    line_obj.line.start = intersection;
+                }
             }
 
             if let Some(rect_obj) = line_obj
@@ -270,6 +267,11 @@ impl terge::App for App {
                 .and_then(|rect_id| self.rectangles.get(&rect_id))
             {
                 line_obj.line.end = rect_obj.rect.midpoint();
+                if let Some(intersection) =
+                    intersection_of_rect_and_anchored_line(&rect_obj.rect, &line_obj.line)
+                {
+                    line_obj.line.end = intersection;
+                }
             }
         }
 
