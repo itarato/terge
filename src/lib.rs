@@ -1,5 +1,6 @@
 use std::{
     io::{self, Write},
+    ops,
     sync::{Arc, atomic::AtomicBool, mpsc},
     thread,
     time::Duration,
@@ -10,7 +11,7 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, poll, read},
     terminal,
 };
-use log::trace;
+use log::{debug, trace};
 
 pub const BLOCK_CHAR: &'static str = "█";
 
@@ -36,6 +37,56 @@ impl Arithmetics<I32Point> for I32Point {
     }
 }
 
+pub fn point_pair_minmax(lhs: I32Point, rhs: I32Point) -> (i32, i32, i32, i32) {
+    (
+        lhs.0.min(rhs.0),
+        lhs.1.min(rhs.1),
+        lhs.0.max(rhs.0),
+        lhs.1.max(rhs.1),
+    )
+}
+
+pub fn intersection_of_rect_and_line(rect: &Rect, line: &Line) -> Vec<I32Point> {
+    let slope = line.slope();
+    let mut out = vec![];
+
+    if line.y_range().contains(&rect.start.1) {
+        let intersect_top_x =
+            (((rect.start.1 - line.start.1) as f32 / slope) + line.start.0 as f32).round() as i32;
+        if intersect_top_x >= rect.start.0 && intersect_top_x <= rect.start.0 + rect.size.0 {
+            out.push((intersect_top_x, rect.start.1));
+        }
+    }
+
+    if line.y_range().contains(&(rect.start.1 + rect.size.1)) {
+        let intersect_bottom_x = (((rect.start.1 + rect.size.1 - line.start.1) as f32 / slope)
+            + line.start.0 as f32)
+            .round() as i32;
+        if intersect_bottom_x >= rect.start.0 && intersect_bottom_x <= rect.start.0 + rect.size.0 {
+            out.push((intersect_bottom_x, rect.start.1 + rect.size.1));
+        }
+    }
+
+    if line.x_range().contains(&rect.start.0) {
+        let intersect_left_y =
+            ((slope * (rect.start.0 - line.start.0) as f32) + line.start.1 as f32).round() as i32;
+        if intersect_left_y >= rect.start.1 && intersect_left_y <= rect.start.1 + rect.size.1 {
+            out.push((rect.start.0, intersect_left_y));
+        }
+    }
+
+    if line.x_range().contains(&(rect.start.0 + rect.size.0)) {
+        let intersect_right_y = ((slope * (rect.start.0 + rect.size.0 - line.start.0) as f32)
+            + line.start.1 as f32)
+            .round() as i32;
+        if intersect_right_y >= rect.start.1 && intersect_right_y <= rect.start.1 + rect.size.1 {
+            out.push((rect.start.0 + rect.size.0, intersect_right_y));
+        }
+    }
+
+    out
+}
+
 // TODO: Add color
 // TODO: Add hover-over highlight
 pub struct Rect {
@@ -47,7 +98,7 @@ pub struct Rect {
 
 impl Rect {
     pub fn new_from_unordered_points(lhs: I32Point, rhs: I32Point) -> Self {
-        let (min_x, min_y, max_x, max_y) = Gfx::point_pair_minmax(lhs, rhs);
+        let (min_x, min_y, max_x, max_y) = point_pair_minmax(lhs, rhs);
         Self {
             start: (min_x, min_y),
             size: (max_x - min_x, max_y - min_y),
@@ -70,9 +121,26 @@ impl Rect {
     }
 }
 
+#[derive(Debug)]
 pub struct Line {
     pub start: I32Point,
     pub end: I32Point,
+}
+
+impl Line {
+    fn slope(&self) -> f32 {
+        let dx = self.end.0 - self.start.0;
+        let dy = self.end.1 - self.start.1;
+        dy as f32 / dx as f32
+    }
+
+    fn x_range(&self) -> ops::RangeInclusive<i32> {
+        self.start.0.min(self.end.0)..=self.start.0.max(self.end.0)
+    }
+
+    fn y_range(&self) -> ops::RangeInclusive<i32> {
+        self.start.1.min(self.end.1)..=self.start.1.max(self.end.1)
+    }
 }
 
 pub trait App {
@@ -174,7 +242,7 @@ impl Gfx {
     }
 
     pub fn draw_rect_from_points(&self, lhs: I32Point, rhs: I32Point) {
-        let (x_min, y_min, x_max, y_max) = Gfx::point_pair_minmax(lhs, rhs);
+        let (x_min, y_min, x_max, y_max) = point_pair_minmax(lhs, rhs);
 
         for y in y_min..=y_max {
             self.draw_text(BLOCK_CHAR, x_min as usize, y as usize);
@@ -197,7 +265,7 @@ impl Gfx {
     }
 
     pub fn draw_line_from_points(&self, start: I32Point, end: I32Point) {
-        let (x_min, y_min, x_max, y_max) = Gfx::point_pair_minmax(start, end);
+        let (x_min, y_min, x_max, y_max) = point_pair_minmax(start, end);
 
         let diff_x = (end.0 - start.0) as f32;
         let diff_y = (end.1 - start.1) as f32;
@@ -221,15 +289,6 @@ impl Gfx {
                 }
             }
         }
-    }
-
-    pub fn point_pair_minmax(lhs: I32Point, rhs: I32Point) -> (i32, i32, i32, i32) {
-        (
-            lhs.0.min(rhs.0),
-            lhs.1.min(rhs.1),
-            lhs.0.max(rhs.0),
-            lhs.1.max(rhs.1),
-        )
     }
 }
 

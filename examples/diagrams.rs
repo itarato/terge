@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind};
 use log::error;
-use terge::{Arithmetics, I32Point, Line, Rect, Terge};
+use terge::{Arithmetics, I32Point, Line, Rect, Terge, intersection_of_rect_and_line};
 
 type IdType = u64;
 
@@ -170,19 +170,29 @@ impl terge::App for App {
         for (_id, rect_obj) in &self.rectangles {
             gfx.draw_rect(&rect_obj.rect);
         }
+
         for (_id, line_obj) in &self.lines {
-            let line_start = line_obj
+            gfx.draw_line(&line_obj.line);
+
+            if let Some(rect_obj) = line_obj
                 .start_anchor_rect_id
                 .and_then(|rect_id| self.rectangles.get(&rect_id))
-                .map(|rect_obj| rect_obj.rect.midpoint())
-                .unwrap_or(line_obj.line.start);
-            let line_end = line_obj
+            {
+                let intersections = intersection_of_rect_and_line(&rect_obj.rect, &line_obj.line);
+                for intersection in intersections {
+                    gfx.draw_text("S", intersection.0 as usize, intersection.1 as usize);
+                }
+            }
+
+            if let Some(rect_obj) = line_obj
                 .end_anchor_rect_id
                 .and_then(|rect_id| self.rectangles.get(&rect_id))
-                .map(|rect_obj| rect_obj.rect.midpoint())
-                .unwrap_or(line_obj.line.end);
-
-            gfx.draw_line_from_points(line_start, line_end);
+            {
+                let intersections = intersection_of_rect_and_line(&rect_obj.rect, &line_obj.line);
+                for intersection in intersections {
+                    gfx.draw_text("E", intersection.0 as usize, intersection.1 as usize);
+                }
+            }
         }
 
         if let Some(draw_action) = &self.action {
@@ -245,6 +255,22 @@ impl terge::App for App {
             self.rectangles
                 .get_mut(&rectangle_id)
                 .map(|rect_obj| rect_obj.rect.start = self.current_mouse_pos.sub(offset));
+        }
+
+        for (_id, line_obj) in self.lines.iter_mut() {
+            if let Some(rect_obj) = line_obj
+                .start_anchor_rect_id
+                .and_then(|rect_id| self.rectangles.get(&rect_id))
+            {
+                line_obj.line.start = rect_obj.rect.midpoint();
+            }
+
+            if let Some(rect_obj) = line_obj
+                .end_anchor_rect_id
+                .and_then(|rect_id| self.rectangles.get(&rect_id))
+            {
+                line_obj.line.end = rect_obj.rect.midpoint();
+            }
         }
 
         true
