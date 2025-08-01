@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
 use log::{debug, error};
-use terge::{Arithmetics, I32Point, Line, Rect, Terge, intersection_of_rect_and_line};
+use terge::{Arithmetics, I32Point, Line, Rect, Terge, UsizePoint, intersection_of_rect_and_line};
 
 type IdType = u64;
 
@@ -19,27 +19,30 @@ fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Option<I3
 }
 
 struct TextEditor {
-    text: String,
+    cursor: UsizePoint,
+    lines: Vec<String>,
 }
 
 impl TextEditor {
     fn new() -> Self {
         Self {
-            text: String::new(),
+            cursor: (0, 0),
+            lines: vec![String::new()],
         }
     }
 
     fn edit(&mut self, event: &KeyEvent) {
         match event.code {
             KeyCode::Char(c) => {
-                self.text.push(c);
+                self.lines[self.cursor.1].push(c);
             }
             KeyCode::Backspace => {
-                self.text.pop();
+                self.lines[self.cursor.1].pop();
             }
             KeyCode::Enter => {
                 if event.modifiers.contains(KeyModifiers::ALT) {
-                    self.text.push('\n');
+                    self.cursor.1 += 1;
+                    self.lines.insert(self.cursor.1, String::new());
                 }
             }
             _ => {}
@@ -59,25 +62,18 @@ impl RectObject {
 }
 
 struct LineObject {
-    id: IdType,
     line: Line,
     start_anchor_rect_id: Option<IdType>,
     end_anchor_rect_id: Option<IdType>,
 }
 
 impl LineObject {
-    fn new(id: IdType, line: Line) -> Self {
-        Self::new_with_anchors(id, line, None, None)
-    }
-
     fn new_with_anchors(
-        id: IdType,
         line: Line,
         start_anchor_rect_id: Option<IdType>,
         end_anchor_rect_id: Option<IdType>,
     ) -> Self {
         Self {
-            id,
             line,
             start_anchor_rect_id,
             end_anchor_rect_id,
@@ -87,12 +83,12 @@ impl LineObject {
 
 struct TextObject {
     start: I32Point,
-    text: String,
+    lines: Vec<String>,
 }
 
 impl TextObject {
-    fn new(start: I32Point, text: String) -> Self {
-        Self { start, text }
+    fn new(start: I32Point, lines: Vec<String>) -> Self {
+        Self { start, lines }
     }
 }
 
@@ -198,7 +194,6 @@ impl App {
             self.lines.insert(
                 new_id,
                 LineObject::new_with_anchors(
-                    new_id,
                     Line {
                         start,
                         end: self.current_mouse_pos,
@@ -228,7 +223,7 @@ impl App {
     fn end_text_mode(&mut self) {
         if let Some(Action::Text { start, editor }) = self.action.take() {
             let id = self.get_id();
-            self.texts.insert(id, TextObject::new(start, editor.text));
+            self.texts.insert(id, TextObject::new(start, editor.lines));
             self.action = None;
         } else {
             unreachable!("Must be text action mode")
@@ -276,8 +271,8 @@ impl terge::App for App {
         }
 
         for (_id, text_obj) in &self.texts {
-            gfx.draw_text(
-                &text_obj.text,
+            gfx.draw_multiline_text(
+                &text_obj.lines,
                 text_obj.start.0 as usize,
                 text_obj.start.1 as usize,
             );
@@ -289,7 +284,7 @@ impl terge::App for App {
                 Action::Line { start } => gfx.draw_line_from_points(*start, self.current_mouse_pos),
                 Action::DragAndDrop { .. } => {}
                 Action::Text { start, editor } => {
-                    gfx.draw_text(&editor.text, start.0 as usize, start.1 as usize);
+                    gfx.draw_multiline_text(&editor.lines, start.0 as usize, start.1 as usize);
                 }
             };
         }

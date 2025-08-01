@@ -11,11 +11,12 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, poll, read},
     terminal,
 };
-use log::{debug, trace};
+use log::trace;
 
 pub const BLOCK_CHAR: &'static str = "█";
 
 pub type I32Point = (i32, i32);
+pub type UsizePoint = (usize, usize);
 
 pub trait Arithmetics<T> {
     fn add(&self, other: T) -> T;
@@ -231,6 +232,12 @@ impl Gfx {
     pub fn draw_text(&self, text: &str, x: usize, y: usize) {
         self.draw_pos(x, y);
         print!("{}", text);
+    }
+
+    pub fn draw_multiline_text(&self, lines: &Vec<String>, x: usize, y: usize) {
+        for (i, line) in lines.iter().enumerate() {
+            self.draw_text(&line, x, y + i);
+        }
     }
 
     fn flush_buffer(&self) {
