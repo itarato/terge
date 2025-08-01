@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind};
-use log::error;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
+use log::{debug, error};
 use terge::{Arithmetics, I32Point, Line, Rect, Terge, intersection_of_rect_and_line};
 
 type IdType = u64;
@@ -16,6 +16,35 @@ fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Option<I3
     }
 
     None
+}
+
+struct TextEditor {
+    text: String,
+}
+
+impl TextEditor {
+    fn new() -> Self {
+        Self {
+            text: String::new(),
+        }
+    }
+
+    fn edit(&mut self, event: &KeyEvent) {
+        match event.code {
+            KeyCode::Char(c) => {
+                self.text.push(c);
+            }
+            KeyCode::Backspace => {
+                self.text.pop();
+            }
+            KeyCode::Enter => {
+                if event.modifiers.contains(KeyModifiers::ALT) {
+                    self.text.push('\n');
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 struct RectObject {
@@ -56,10 +85,22 @@ impl LineObject {
     }
 }
 
+struct TextObject {
+    start: I32Point,
+    text: String,
+}
+
+impl TextObject {
+    fn new(start: I32Point, text: String) -> Self {
+        Self { start, text }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum DrawIntent {
+enum Intent {
     Line,
     Rect,
+    Text,
 }
 
 enum Action {
@@ -69,19 +110,42 @@ enum Action {
     Rect {
         start: I32Point,
     },
+    Text {
+        start: I32Point,
+        editor: TextEditor,
+    },
     DragAndDrop {
         rectangle_id: IdType,
         offset: I32Point,
     },
 }
 
+impl Action {
+    fn is_text(&self) -> bool {
+        match self {
+            Action::Text { .. } => true,
+            _ => false,
+        }
+    }
+
+    fn to_string_short(&self) -> &str {
+        match self {
+            Action::Line { .. } => "line",
+            Action::Rect { .. } => "rect",
+            Action::Text { .. } => "text",
+            Action::DragAndDrop { .. } => "drag and drop",
+        }
+    }
+}
+
 struct App {
     id_provider: u64,
     action: Option<Action>,
-    draw_mode_indent: DrawIntent,
+    intent: Intent,
     current_mouse_pos: I32Point,
     rectangles: HashMap<IdType, RectObject>,
     lines: HashMap<IdType, LineObject>,
+    texts: HashMap<IdType, TextObject>,
 }
 
 impl App {
@@ -89,10 +153,11 @@ impl App {
         Self {
             id_provider: 0,
             action: None,
-            draw_mode_indent: DrawIntent::Rect,
+            intent: Intent::Rect,
             current_mouse_pos: (-1, -1),
             rectangles: HashMap::new(),
             lines: HashMap::new(),
+            texts: HashMap::new(),
         }
     }
 
@@ -101,56 +166,72 @@ impl App {
         self.id_provider
     }
 
-    fn start_draw_mode(&mut self, start: I32Point) {
+    fn start_action(&mut self, start: I32Point) {
         if self.action.is_some() {
             error!("Starting draw mode when there is already one.");
             return;
         }
 
-        match self.draw_mode_indent {
-            DrawIntent::Line => self.action = Some(Action::Line { start }),
-            DrawIntent::Rect => self.action = Some(Action::Rect { start }),
+        match self.intent {
+            Intent::Line => self.action = Some(Action::Line { start }),
+            Intent::Rect => self.action = Some(Action::Rect { start }),
+            Intent::Text => {
+                self.action = Some(Action::Text {
+                    start,
+                    editor: TextEditor::new(),
+                })
+            }
         }
     }
 
     fn end_draw_mode(&mut self) {
-        if let Some(action) = self.action.take() {
-            match action {
-                Action::Line { start } => {
-                    let new_id = self.get_id();
+        if let Some(Action::Line { start }) = self.action {
+            let new_id = self.get_id();
 
-                    let start_anchor_rect_id = self
-                        .rectangle_under_point(start)
-                        .map(|rect_obj| rect_obj.id);
-                    let end_anchor_rect_id = self
-                        .rectangle_under_point(self.current_mouse_pos)
-                        .map(|rect_obj| rect_obj.id);
+            let start_anchor_rect_id = self
+                .rectangle_under_point(start)
+                .map(|rect_obj| rect_obj.id);
+            let end_anchor_rect_id = self
+                .rectangle_under_point(self.current_mouse_pos)
+                .map(|rect_obj| rect_obj.id);
 
-                    self.lines.insert(
-                        new_id,
-                        LineObject::new_with_anchors(
-                            new_id,
-                            Line {
-                                start,
-                                end: self.current_mouse_pos,
-                            },
-                            start_anchor_rect_id,
-                            end_anchor_rect_id,
-                        ),
-                    );
-                }
-                Action::Rect { start } => {
-                    let new_id = self.get_id();
-                    self.rectangles.insert(
-                        new_id,
-                        RectObject::new(
-                            new_id,
-                            Rect::new_from_unordered_points(start, self.current_mouse_pos),
-                        ),
-                    );
-                }
-                _ => {}
-            }
+            self.lines.insert(
+                new_id,
+                LineObject::new_with_anchors(
+                    new_id,
+                    Line {
+                        start,
+                        end: self.current_mouse_pos,
+                    },
+                    start_anchor_rect_id,
+                    end_anchor_rect_id,
+                ),
+            );
+
+            self.action = None;
+        } else if let Some(Action::Rect { start }) = self.action {
+            let new_id = self.get_id();
+            self.rectangles.insert(
+                new_id,
+                RectObject::new(
+                    new_id,
+                    Rect::new_from_unordered_points(start, self.current_mouse_pos),
+                ),
+            );
+
+            self.action = None;
+        } else if let Some(Action::DragAndDrop { .. }) = self.action {
+            self.action = None;
+        }
+    }
+
+    fn end_text_mode(&mut self) {
+        if let Some(Action::Text { start, editor }) = self.action.take() {
+            let id = self.get_id();
+            self.texts.insert(id, TextObject::new(start, editor.text));
+            self.action = None;
+        } else {
+            unreachable!("Must be text action mode")
         }
     }
 
@@ -173,6 +254,13 @@ impl App {
 
         None
     }
+
+    fn is_active_action_text(&self) -> bool {
+        self.action
+            .as_ref()
+            .map(|action| action.is_text())
+            .unwrap_or(false)
+    }
 }
 
 impl terge::App for App {
@@ -187,13 +275,37 @@ impl terge::App for App {
             gfx.draw_line(&line_obj.line);
         }
 
+        for (_id, text_obj) in &self.texts {
+            gfx.draw_text(
+                &text_obj.text,
+                text_obj.start.0 as usize,
+                text_obj.start.1 as usize,
+            );
+        }
+
         if let Some(draw_action) = &self.action {
             match draw_action {
                 Action::Rect { start } => gfx.draw_rect_from_points(*start, self.current_mouse_pos),
                 Action::Line { start } => gfx.draw_line_from_points(*start, self.current_mouse_pos),
-                _ => {}
+                Action::DragAndDrop { .. } => {}
+                Action::Text { start, editor } => {
+                    gfx.draw_text(&editor.text, start.0 as usize, start.1 as usize);
+                }
             };
         }
+
+        gfx.draw_text(
+            &format!(
+                "Intent: {:?} | Active: {:?}",
+                self.intent,
+                self.action
+                    .as_ref()
+                    .map(|a| a.to_string_short())
+                    .unwrap_or("-")
+            ),
+            0,
+            gfx.height - 1,
+        );
     }
 
     fn reset(&mut self, _gfx: &mut terge::Gfx) {}
@@ -216,10 +328,7 @@ impl terge::App for App {
                                 offset: self.current_mouse_pos.sub(rect_obj.rect.start),
                             });
                         } else {
-                            self.start_draw_mode((
-                                mouse_event.column as i32,
-                                mouse_event.row as i32,
-                            ));
+                            self.start_action((mouse_event.column as i32, mouse_event.row as i32));
                         }
                     }
                     if mouse_event.kind == MouseEventKind::Up(MouseButton::Left) {
@@ -228,9 +337,28 @@ impl terge::App for App {
                 }
                 Event::Key(key_event) => {
                     if key_event.is_press() {
+                        if self.is_active_action_text() {
+                            if key_event.code == KeyCode::Enter
+                                && !key_event.modifiers.contains(KeyModifiers::ALT)
+                            {
+                                debug!("END {:?}", key_event);
+                                self.end_text_mode();
+                            } else {
+                                if let Some(Action::Text { editor, .. }) = self.action.as_mut() {
+                                    editor.edit(&key_event);
+                                } else {
+                                    unreachable!("Must be text action");
+                                }
+                            }
+                        }
+
                         match key_event.code {
-                            KeyCode::Char('r') => self.draw_mode_indent = DrawIntent::Rect,
-                            KeyCode::Char('l') => self.draw_mode_indent = DrawIntent::Line,
+                            KeyCode::Char(c) => match c {
+                                'r' => self.intent = Intent::Rect,
+                                'l' => self.intent = Intent::Line,
+                                't' => self.intent = Intent::Text,
+                                _ => {}
+                            },
                             _ => {}
                         }
                     }
