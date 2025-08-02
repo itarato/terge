@@ -88,8 +88,6 @@ pub fn intersection_of_rect_and_line(rect: &Rect, line: &Line) -> Vec<I32Point> 
     out
 }
 
-// TODO: Add color
-// TODO: Add hover-over highlight
 pub struct Rect {
     // Start is always the upper-left corner (min-x:min-y).
     pub start: I32Point,

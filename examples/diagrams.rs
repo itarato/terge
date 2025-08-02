@@ -67,6 +67,8 @@ impl TextEditor {
     }
 }
 
+// TODO: Add color
+// TODO: Add hover-over highlight
 struct RectObject {
     id: IdType,
     rect: Rect,
@@ -97,17 +99,12 @@ struct LineObject {
 }
 
 impl LineObject {
-    fn new_with_anchors(
-        id: IdType,
-        line: Line,
-        start_anchor_rect_id: Option<IdType>,
-        end_anchor_rect_id: Option<IdType>,
-    ) -> Self {
+    fn new(id: IdType, line: Line) -> Self {
         Self {
             id,
             line,
-            start_anchor_rect_id,
-            end_anchor_rect_id,
+            start_anchor_rect_id: None,
+            end_anchor_rect_id: None,
         }
     }
 }
@@ -234,25 +231,19 @@ impl App {
             Some(Action::Line { start }) => {
                 let new_id = self.get_id();
 
-                let start_anchor_rect_id = self
-                    .rectangle_under_point(start)
-                    .map(|rect_obj| rect_obj.id);
-                let end_anchor_rect_id = self
-                    .rectangle_under_point(self.current_mouse_pos)
-                    .map(|rect_obj| rect_obj.id);
-
                 self.lines.insert(
                     new_id,
-                    LineObject::new_with_anchors(
+                    LineObject::new(
                         new_id,
                         Line {
                             start,
                             end: self.current_mouse_pos,
                         },
-                        start_anchor_rect_id,
-                        end_anchor_rect_id,
                     ),
                 );
+
+                self.update_line_start_anchor(new_id);
+                self.update_line_end_anchor(new_id);
 
                 self.action = None;
             }
@@ -268,10 +259,17 @@ impl App {
 
                 self.action = None;
             }
-            Some(Action::DragLineStart { .. })
-            | Some(Action::DragLineEnd { .. })
-            | Some(Action::DragRectangle { .. })
-            | Some(Action::ResizeRectangle { .. }) => self.action = None,
+            Some(Action::DragLineStart { line_id }) => {
+                self.update_line_start_anchor(line_id);
+                self.action = None;
+            }
+            Some(Action::DragLineEnd { line_id }) => {
+                self.update_line_end_anchor(line_id);
+                self.action = None;
+            }
+            Some(Action::DragRectangle { .. }) | Some(Action::ResizeRectangle { .. }) => {
+                self.action = None
+            }
             Some(Action::Text { .. }) | None => {}
         }
     }
@@ -289,6 +287,28 @@ impl App {
         } else {
             unreachable!("Must be text action mode")
         }
+    }
+
+    fn update_line_start_anchor(&mut self, line_id: IdType) {
+        let anchor = self.lines.get(&line_id).and_then(|line_obj| {
+            self.rectangle_under_point(line_obj.line.start)
+                .map(|rect_obj| rect_obj.id)
+        });
+
+        self.lines
+            .get_mut(&line_id)
+            .map(|line_obj| line_obj.start_anchor_rect_id = anchor);
+    }
+
+    fn update_line_end_anchor(&mut self, line_id: IdType) {
+        let anchor = self.lines.get(&line_id).and_then(|line_obj| {
+            self.rectangle_under_point(line_obj.line.end)
+                .map(|rect_obj| rect_obj.id)
+        });
+
+        self.lines
+            .get_mut(&line_id)
+            .map(|line_obj| line_obj.end_anchor_rect_id = anchor);
     }
 
     fn rectangle_header_under_point(&self, p: I32Point) -> Option<&RectObject> {
