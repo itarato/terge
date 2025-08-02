@@ -345,16 +345,16 @@ impl terge::App for App {
                                     unreachable!("Must be text action");
                                 }
                             }
-                        }
-
-                        match key_event.code {
-                            KeyCode::Char(c) => match c {
-                                'r' => self.intent = Intent::Rect,
-                                'l' => self.intent = Intent::Line,
-                                't' => self.intent = Intent::Text,
+                        } else {
+                            match key_event.code {
+                                KeyCode::Char(c) => match c {
+                                    'r' => self.intent = Intent::Rect,
+                                    'l' => self.intent = Intent::Line,
+                                    't' => self.intent = Intent::Text,
+                                    _ => {}
+                                },
                                 _ => {}
-                            },
-                            _ => {}
+                            }
                         }
                     }
                 }
