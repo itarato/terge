@@ -341,8 +341,8 @@ impl App {
         None
     }
 
-    fn line_with_start_under_point(&self, p: I32Point) -> Option<&LineObject> {
-        for (_id, line_obj) in &self.lines {
+    fn line_with_start_under_point(&mut self, p: I32Point) -> Option<&mut LineObject> {
+        for (_id, line_obj) in &mut self.lines {
             if line_obj.line.start == p {
                 return Some(line_obj);
             }
@@ -350,8 +350,8 @@ impl App {
         None
     }
 
-    fn line_with_end_under_point(&self, p: I32Point) -> Option<&LineObject> {
-        for (_id, line_obj) in &self.lines {
+    fn line_with_end_under_point(&mut self, p: I32Point) -> Option<&mut LineObject> {
+        for (_id, line_obj) in &mut self.lines {
             if line_obj.line.end == p {
                 return Some(line_obj);
             }
@@ -451,12 +451,14 @@ impl terge::App for App {
                         } else if let Some(line_obj) =
                             self.line_with_start_under_point(self.current_mouse_pos)
                         {
+                            line_obj.start_anchor_rect_id = None;
                             self.action = Some(Action::DragLineStart {
                                 line_id: line_obj.id,
                             });
                         } else if let Some(line_obj) =
                             self.line_with_end_under_point(self.current_mouse_pos)
                         {
+                            line_obj.end_anchor_rect_id = None;
                             self.action = Some(Action::DragLineEnd {
                                 line_id: line_obj.id,
                             });
