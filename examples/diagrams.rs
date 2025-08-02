@@ -90,6 +90,7 @@ impl RectObject {
 }
 
 struct LineObject {
+    id: IdType,
     line: Line,
     start_anchor_rect_id: Option<IdType>,
     end_anchor_rect_id: Option<IdType>,
@@ -97,11 +98,13 @@ struct LineObject {
 
 impl LineObject {
     fn new_with_anchors(
+        id: IdType,
         line: Line,
         start_anchor_rect_id: Option<IdType>,
         end_anchor_rect_id: Option<IdType>,
     ) -> Self {
         Self {
+            id,
             line,
             start_anchor_rect_id,
             end_anchor_rect_id,
@@ -147,6 +150,12 @@ enum Action {
         rectangle_id: IdType,
         offset: I32Point,
     },
+    DragLineStart {
+        line_id: IdType,
+    },
+    DragLineEnd {
+        line_id: IdType,
+    },
     ResizeRectangle {
         rectangle_id: IdType,
         orig_start: I32Point,
@@ -168,6 +177,8 @@ impl Action {
             Action::Text { .. } => "text",
             Action::DragRectangle { .. } => "drag rectangle",
             Action::ResizeRectangle { .. } => "resize rectangle",
+            Action::DragLineStart { .. } => "drag line start",
+            Action::DragLineEnd { .. } => "drag line end",
         }
     }
 }
@@ -219,44 +230,49 @@ impl App {
     }
 
     fn on_mouse_left_release(&mut self) {
-        if let Some(Action::Line { start }) = self.action {
-            let new_id = self.get_id();
+        match self.action {
+            Some(Action::Line { start }) => {
+                let new_id = self.get_id();
 
-            let start_anchor_rect_id = self
-                .rectangle_under_point(start)
-                .map(|rect_obj| rect_obj.id);
-            let end_anchor_rect_id = self
-                .rectangle_under_point(self.current_mouse_pos)
-                .map(|rect_obj| rect_obj.id);
+                let start_anchor_rect_id = self
+                    .rectangle_under_point(start)
+                    .map(|rect_obj| rect_obj.id);
+                let end_anchor_rect_id = self
+                    .rectangle_under_point(self.current_mouse_pos)
+                    .map(|rect_obj| rect_obj.id);
 
-            self.lines.insert(
-                new_id,
-                LineObject::new_with_anchors(
-                    Line {
-                        start,
-                        end: self.current_mouse_pos,
-                    },
-                    start_anchor_rect_id,
-                    end_anchor_rect_id,
-                ),
-            );
-
-            self.action = None;
-        } else if let Some(Action::Rect { start }) = self.action {
-            let new_id = self.get_id();
-            self.rectangles.insert(
-                new_id,
-                RectObject::new(
+                self.lines.insert(
                     new_id,
-                    Rect::new_from_unordered_points(start, self.current_mouse_pos),
-                ),
-            );
+                    LineObject::new_with_anchors(
+                        new_id,
+                        Line {
+                            start,
+                            end: self.current_mouse_pos,
+                        },
+                        start_anchor_rect_id,
+                        end_anchor_rect_id,
+                    ),
+                );
 
-            self.action = None;
-        } else if let Some(Action::DragRectangle { .. }) = self.action {
-            self.action = None;
-        } else if let Some(Action::ResizeRectangle { .. }) = self.action {
-            self.action = None;
+                self.action = None;
+            }
+            Some(Action::Rect { start }) => {
+                let new_id = self.get_id();
+                self.rectangles.insert(
+                    new_id,
+                    RectObject::new(
+                        new_id,
+                        Rect::new_from_unordered_points(start, self.current_mouse_pos),
+                    ),
+                );
+
+                self.action = None;
+            }
+            Some(Action::DragLineStart { .. })
+            | Some(Action::DragLineEnd { .. })
+            | Some(Action::DragRectangle { .. })
+            | Some(Action::ResizeRectangle { .. }) => self.action = None,
+            Some(Action::Text { .. }) | None => {}
         }
     }
 
@@ -305,6 +321,24 @@ impl App {
         None
     }
 
+    fn line_with_start_under_point(&self, p: I32Point) -> Option<&LineObject> {
+        for (_id, line_obj) in &self.lines {
+            if line_obj.line.start == p {
+                return Some(line_obj);
+            }
+        }
+        None
+    }
+
+    fn line_with_end_under_point(&self, p: I32Point) -> Option<&LineObject> {
+        for (_id, line_obj) in &self.lines {
+            if line_obj.line.end == p {
+                return Some(line_obj);
+            }
+        }
+        None
+    }
+
     fn is_active_action_text(&self) -> bool {
         self.action
             .as_ref()
@@ -345,6 +379,8 @@ impl terge::App for App {
                 Action::Rect { start } => gfx.draw_rect_from_points(*start, self.current_mouse_pos),
                 Action::Line { start } => gfx.draw_line_from_points(*start, self.current_mouse_pos),
                 Action::DragRectangle { .. } => {}
+                Action::DragLineStart { .. } => {}
+                Action::DragLineEnd { .. } => {}
                 Action::ResizeRectangle { .. } => {}
                 Action::Text { start, editor } => {
                     gfx.draw_multiline_text(&editor.lines, start.0 as usize, start.1 as usize);
@@ -391,6 +427,18 @@ impl terge::App for App {
                             self.action = Some(Action::ResizeRectangle {
                                 rectangle_id: rect_obj.id,
                                 orig_start: rect_obj.rect.start,
+                            });
+                        } else if let Some(line_obj) =
+                            self.line_with_start_under_point(self.current_mouse_pos)
+                        {
+                            self.action = Some(Action::DragLineStart {
+                                line_id: line_obj.id,
+                            });
+                        } else if let Some(line_obj) =
+                            self.line_with_end_under_point(self.current_mouse_pos)
+                        {
+                            self.action = Some(Action::DragLineEnd {
+                                line_id: line_obj.id,
                             });
                         } else {
                             self.start_action((mouse_event.column as i32, mouse_event.row as i32));
@@ -449,6 +497,14 @@ impl terge::App for App {
             self.rectangles
                 .get_mut(&rectangle_id)
                 .map(|rect_obj| rect_obj.resize(orig_start, self.current_mouse_pos));
+        } else if let Some(Action::DragLineStart { line_id }) = self.action {
+            self.lines
+                .get_mut(&line_id)
+                .map(|line_obj| line_obj.line.start = self.current_mouse_pos);
+        } else if let Some(Action::DragLineEnd { line_id }) = self.action {
+            self.lines
+                .get_mut(&line_id)
+                .map(|line_obj| line_obj.line.end = self.current_mouse_pos);
         }
 
         for (_id, line_obj) in self.lines.iter_mut() {
