@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
 use log::{debug, error};
-use terge::{Arithmetics, I32Point, Line, Rect, Terge, UsizePoint, intersection_of_rect_and_line};
+use terge::{
+    Arithmetics, Gfx, I32Point, Line, Rect, Terge, UsizePoint, intersection_of_rect_and_line,
+};
 
 type IdType = u64;
 
@@ -16,6 +18,14 @@ fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Option<I3
     }
 
     None
+}
+
+fn draw_text_inside_rectangle(gfx: &mut Gfx, text_obj: &TextObject, rect_obj: &RectObject) {
+    gfx.draw_multiline_text(
+        &text_obj.lines,
+        rect_obj.rect.start.0 as usize,
+        rect_obj.rect.start.1 as usize,
+    );
 }
 
 struct TextEditor {
@@ -84,11 +94,16 @@ impl LineObject {
 struct TextObject {
     start: I32Point,
     lines: Vec<String>,
+    anchor_rect_id: Option<IdType>,
 }
 
 impl TextObject {
-    fn new(start: I32Point, lines: Vec<String>) -> Self {
-        Self { start, lines }
+    fn new(start: I32Point, lines: Vec<String>, anchor_rect_id: Option<IdType>) -> Self {
+        Self {
+            start,
+            lines,
+            anchor_rect_id,
+        }
     }
 }
 
@@ -180,7 +195,7 @@ impl App {
         }
     }
 
-    fn end_draw_mode(&mut self) {
+    fn on_mouse_left_release(&mut self) {
         if let Some(Action::Line { start }) = self.action {
             let new_id = self.get_id();
 
@@ -222,8 +237,13 @@ impl App {
 
     fn end_text_mode(&mut self) {
         if let Some(Action::Text { start, editor }) = self.action.take() {
+            let anchor_rect_id = self
+                .rectangle_under_point(start)
+                .map(|rect_obj| rect_obj.id);
+
             let id = self.get_id();
-            self.texts.insert(id, TextObject::new(start, editor.lines));
+            self.texts
+                .insert(id, TextObject::new(start, editor.lines, anchor_rect_id));
             self.action = None;
         } else {
             unreachable!("Must be text action mode")
@@ -271,11 +291,18 @@ impl terge::App for App {
         }
 
         for (_id, text_obj) in &self.texts {
-            gfx.draw_multiline_text(
-                &text_obj.lines,
-                text_obj.start.0 as usize,
-                text_obj.start.1 as usize,
-            );
+            if let Some(rect_obj) = text_obj
+                .anchor_rect_id
+                .and_then(|id| self.rectangles.get(&id))
+            {
+                draw_text_inside_rectangle(gfx, text_obj, rect_obj);
+            } else {
+                gfx.draw_multiline_text(
+                    &text_obj.lines,
+                    text_obj.start.0 as usize,
+                    text_obj.start.1 as usize,
+                );
+            }
         }
 
         if let Some(draw_action) = &self.action {
@@ -327,7 +354,7 @@ impl terge::App for App {
                         }
                     }
                     if mouse_event.kind == MouseEventKind::Up(MouseButton::Left) {
-                        self.end_draw_mode();
+                        self.on_mouse_left_release();
                     }
                 }
                 Event::Key(key_event) => {
