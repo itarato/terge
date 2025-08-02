@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use log::{debug, error};
 use terge::{
     Arithmetics, Gfx, I32Point, Line, Rect, Terge, UsizePoint, intersection_of_rect_and_line,
@@ -10,6 +12,7 @@ use terge::{
 type IdType = u64;
 
 const DRAG_STR: &'static str = "+";
+const EDIT_STR: &'static str = "#";
 
 fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Option<I32Point> {
     let intersections = intersection_of_rect_and_line(rect, line);
@@ -47,6 +50,13 @@ impl TextEditor {
         Self {
             cursor: (0, 0),
             lines: vec![String::new()],
+        }
+    }
+
+    fn new_with_lines(lines: Vec<String>) -> Self {
+        Self {
+            cursor: (0, 0),
+            lines,
         }
     }
 
@@ -112,18 +122,29 @@ impl LineObject {
 }
 
 struct TextObject {
+    id: IdType,
     start: I32Point,
     lines: Vec<String>,
     anchor_rect_id: Option<IdType>,
 }
 
 impl TextObject {
-    fn new(start: I32Point, lines: Vec<String>, anchor_rect_id: Option<IdType>) -> Self {
+    fn new(
+        id: IdType,
+        start: I32Point,
+        lines: Vec<String>,
+        anchor_rect_id: Option<IdType>,
+    ) -> Self {
         Self {
+            id,
             start,
             lines,
             anchor_rect_id,
         }
+    }
+
+    fn is_edit_point(&self, p: I32Point) -> bool {
+        self.start == p
     }
 }
 
@@ -228,7 +249,7 @@ impl App {
         }
     }
 
-    fn on_mouse_left_release(&mut self) {
+    fn on_mouse_left_up(&mut self) {
         match self.action {
             Some(Action::Line { start }) => {
                 let new_id = self.get_id();
@@ -284,7 +305,7 @@ impl App {
 
             let id = self.get_id();
             self.texts
-                .insert(id, TextObject::new(start, editor.lines, anchor_rect_id));
+                .insert(id, TextObject::new(id, start, editor.lines, anchor_rect_id));
             self.action = None;
         } else {
             unreachable!("Must be text action mode")
@@ -343,6 +364,26 @@ impl App {
         None
     }
 
+    fn is_text_editable_at(&self, text_obj: &TextObject, p: I32Point) -> bool {
+        if let Some(rect_obj) = text_obj
+            .anchor_rect_id
+            .and_then(|id| self.rectangles.get(&id))
+        {
+            rect_obj.rect.is_point_inside(p)
+        } else {
+            text_obj.is_edit_point(p)
+        }
+    }
+
+    fn text_under_point(&self, p: I32Point) -> Option<&TextObject> {
+        for (_id, text_obj) in &self.texts {
+            if self.is_text_editable_at(text_obj, p) {
+                return Some(text_obj);
+            }
+        }
+        None
+    }
+
     fn line_with_start_under_point(&mut self, p: I32Point) -> Option<&mut LineObject> {
         for (_id, line_obj) in &mut self.lines {
             if line_obj.line.start == p {
@@ -366,6 +407,43 @@ impl App {
             .as_ref()
             .map(|action| action.is_text())
             .unwrap_or(false)
+    }
+
+    fn on_left_mouse_button_down(&mut self, mouse_event: &MouseEvent) {
+        if let Some(rect_obj) = self.rectangle_header_under_point(self.current_mouse_pos) {
+            self.action = Some(Action::DragRectangle {
+                rectangle_id: rect_obj.id,
+                offset: self.current_mouse_pos.sub(rect_obj.rect.start),
+            });
+        } else if let Some(rect_obj) =
+            self.rectangle_resize_point_under_point(self.current_mouse_pos)
+        {
+            self.action = Some(Action::ResizeRectangle {
+                rectangle_id: rect_obj.id,
+                orig_start: rect_obj.rect.start,
+            });
+        } else if let Some(line_obj) = self.line_with_start_under_point(self.current_mouse_pos) {
+            line_obj.start_anchor_rect_id = None;
+            self.action = Some(Action::DragLineStart {
+                line_id: line_obj.id,
+            });
+        } else if let Some(line_obj) = self.line_with_end_under_point(self.current_mouse_pos) {
+            line_obj.end_anchor_rect_id = None;
+            self.action = Some(Action::DragLineEnd {
+                line_id: line_obj.id,
+            });
+        } else if let Some(text_obj) = self.text_under_point(self.current_mouse_pos) {
+            let id = text_obj.id;
+
+            self.action = Some(Action::Text {
+                start: text_obj.start,
+                editor: TextEditor::new_with_lines(text_obj.lines.clone()),
+            });
+
+            self.texts.remove(&id);
+        } else {
+            self.start_action((mouse_event.column as i32, mouse_event.row as i32));
+        }
     }
 }
 
@@ -404,6 +482,10 @@ impl terge::App for App {
                     text_obj.start.0 as usize,
                     text_obj.start.1 as usize,
                 );
+            }
+
+            if self.is_text_editable_at(text_obj, self.current_mouse_pos) {
+                gfx.draw_text_at_point(EDIT_STR, self.current_mouse_pos);
             }
         }
 
@@ -447,40 +529,10 @@ impl terge::App for App {
             match e {
                 Event::Mouse(mouse_event) => {
                     if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
-                        if let Some(rect_obj) =
-                            self.rectangle_header_under_point(self.current_mouse_pos)
-                        {
-                            self.action = Some(Action::DragRectangle {
-                                rectangle_id: rect_obj.id,
-                                offset: self.current_mouse_pos.sub(rect_obj.rect.start),
-                            });
-                        } else if let Some(rect_obj) =
-                            self.rectangle_resize_point_under_point(self.current_mouse_pos)
-                        {
-                            self.action = Some(Action::ResizeRectangle {
-                                rectangle_id: rect_obj.id,
-                                orig_start: rect_obj.rect.start,
-                            });
-                        } else if let Some(line_obj) =
-                            self.line_with_start_under_point(self.current_mouse_pos)
-                        {
-                            line_obj.start_anchor_rect_id = None;
-                            self.action = Some(Action::DragLineStart {
-                                line_id: line_obj.id,
-                            });
-                        } else if let Some(line_obj) =
-                            self.line_with_end_under_point(self.current_mouse_pos)
-                        {
-                            line_obj.end_anchor_rect_id = None;
-                            self.action = Some(Action::DragLineEnd {
-                                line_id: line_obj.id,
-                            });
-                        } else {
-                            self.start_action((mouse_event.column as i32, mouse_event.row as i32));
-                        }
+                        self.on_left_mouse_button_down(&mouse_event);
                     }
                     if mouse_event.kind == MouseEventKind::Up(MouseButton::Left) {
-                        self.on_mouse_left_release();
+                        self.on_mouse_left_up();
                     }
                 }
                 Event::Key(key_event) => {

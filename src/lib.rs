@@ -115,6 +115,13 @@ impl Rect {
             && p.1 <= (self.start.1 + self.size.1)
     }
 
+    pub fn is_point_inside(&self, p: I32Point) -> bool {
+        p.0 >= self.start.0 + 1
+            && p.0 <= (self.start.0 + self.size.0) - 1
+            && p.1 >= self.start.1 + 1
+            && p.1 <= (self.start.1 + self.size.1) - 1
+    }
+
     pub fn midpoint(&self) -> I32Point {
         self.start.add(self.size.div(2))
     }
