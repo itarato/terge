@@ -48,7 +48,7 @@ struct TextEditor {
 impl TextEditor {
     fn new() -> Self {
         Self {
-            cursor: (0, 0),
+            cursor: (0, 0), // X is ignored for now.
             lines: vec![String::new()],
         }
     }
@@ -66,7 +66,12 @@ impl TextEditor {
                 self.lines[self.cursor.1].push(c);
             }
             KeyCode::Backspace => {
-                self.lines[self.cursor.1].pop();
+                if self.lines[self.cursor.1].pop().is_none() {
+                    if self.cursor.1 > 0 {
+                        self.lines.remove(self.cursor.1);
+                        self.cursor.1 -= 1;
+                    }
+                }
             }
             KeyCode::Enter => {
                 if event.modifiers.contains(KeyModifiers::ALT) {
@@ -499,6 +504,7 @@ impl terge::App for App {
                 Action::ResizeRectangle { .. } => {}
                 Action::Text { start, editor } => {
                     gfx.draw_multiline_text(&editor.lines, start.0 as usize, start.1 as usize);
+                    gfx.draw_text_to_current_pos("_");
                 }
             };
         }

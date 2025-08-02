@@ -239,6 +239,10 @@ impl Gfx {
         print!("{}", text);
     }
 
+    pub fn draw_text_to_current_pos(&self, text: &str) {
+        print!("{}", text);
+    }
+
     pub fn draw_text_at_point(&self, text: &str, p: I32Point) {
         self.draw_text(text, p.0 as usize, p.1 as usize);
     }
