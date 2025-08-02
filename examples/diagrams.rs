@@ -9,6 +9,8 @@ use terge::{
 
 type IdType = u64;
 
+const DRAG_STR: &'static str = "+";
+
 fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Option<I32Point> {
     let intersections = intersection_of_rect_and_line(rect, line);
 
@@ -373,10 +375,21 @@ impl terge::App for App {
 
         for (_id, rect_obj) in &self.rectangles {
             gfx.draw_rect(&rect_obj.rect);
+
+            if rect_obj.end() == self.current_mouse_pos {
+                gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos);
+            }
         }
 
         for (_id, line_obj) in &self.lines {
             gfx.draw_line(&line_obj.line);
+
+            if line_obj.line.start == self.current_mouse_pos {
+                gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos);
+            }
+            if line_obj.line.end == self.current_mouse_pos {
+                gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos);
+            }
         }
 
         for (_id, text_obj) in &self.texts {

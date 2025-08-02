@@ -232,6 +232,10 @@ impl Gfx {
         print!("{}", text);
     }
 
+    pub fn draw_text_at_point(&self, text: &str, p: I32Point) {
+        self.draw_text(text, p.0 as usize, p.1 as usize);
+    }
+
     pub fn draw_multiline_text(&self, lines: &Vec<String>, x: usize, y: usize) {
         for (i, line) in lines.iter().enumerate() {
             self.draw_text(&line, x, y + i);
