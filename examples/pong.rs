@@ -23,8 +23,8 @@ impl terge::App for App {
     fn draw(&self, gfx: &mut Gfx) {
         gfx.clear_screen();
 
-        gfx.draw_text("████████", self.pad_x as usize, gfx.height - 1);
-        gfx.draw_text("O", self.ball_pos.x as usize, self.ball_pos.y as usize);
+        gfx.draw_text_uncoloured("████████", self.pad_x as usize, gfx.height - 1);
+        gfx.draw_text_uncoloured("O", self.ball_pos.x as usize, self.ball_pos.y as usize);
     }
 
     fn update(&mut self, events: &EventGroup, gfx: &mut Gfx) -> bool {

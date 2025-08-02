@@ -29,7 +29,7 @@ impl App {
 impl terge::App for App {
     fn draw(&self, gfx: &mut Gfx) {
         gfx.clear_screen();
-        gfx.draw_text(
+        gfx.draw_text_uncoloured(
             format!("FPS: {}", self.fps).as_str(),
             gfx.width / 2 - 4,
             gfx.height / 2,
@@ -37,7 +37,7 @@ impl terge::App for App {
 
         if let Some(ch) = self.ch {
             debug!("Print char: {}", ch);
-            gfx.draw_text(&ch.to_string(), gfx.width / 2, gfx.height / 2 + 2);
+            gfx.draw_text_uncoloured(&ch.to_string(), gfx.width / 2, gfx.height / 2 + 2);
         } else {
             debug!("NO CHAR");
         }

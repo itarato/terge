@@ -14,6 +14,7 @@ use crossterm::{
 use log::trace;
 
 pub const BLOCK_CHAR: &'static str = "█";
+pub const DEFAULT_COLOR_CODE: u8 = 0;
 
 pub type I32Point = (i32, i32);
 pub type UsizePoint = (usize, usize);
@@ -234,22 +235,29 @@ impl Gfx {
         print!("\x1B[{};{}H", y + 1, x + 1);
     }
 
-    pub fn draw_text(&self, text: &str, x: usize, y: usize) {
+    pub fn draw_text(&self, text: &str, x: usize, y: usize, color: u8) {
         self.draw_pos(x, y);
-        print!("{}", text);
+        print!("\x1B[{}m{}\x1B[0m", color, text);
+    }
+
+    pub fn draw_text_uncoloured(&self, text: &str, x: usize, y: usize) {
+        self.draw_pos(x, y);
+        io::stdout()
+            .write_all(text.as_bytes())
+            .expect("Failed writing bytes");
     }
 
     pub fn draw_text_to_current_pos(&self, text: &str) {
         print!("{}", text);
     }
 
-    pub fn draw_text_at_point(&self, text: &str, p: I32Point) {
-        self.draw_text(text, p.0 as usize, p.1 as usize);
+    pub fn draw_text_at_point(&self, text: &str, p: I32Point, color: u8) {
+        self.draw_text(text, p.0 as usize, p.1 as usize, color);
     }
 
-    pub fn draw_multiline_text(&self, lines: &Vec<String>, x: usize, y: usize) {
+    pub fn draw_multiline_text(&self, lines: &Vec<String>, x: usize, y: usize, color: u8) {
         for (i, line) in lines.iter().enumerate() {
-            self.draw_text(&line, x, y + i);
+            self.draw_text(&line, x, y + i, color);
         }
     }
 
@@ -257,27 +265,31 @@ impl Gfx {
         std::io::stdout().flush().expect("Failed flushing STDOUT");
     }
 
-    pub fn draw_rect(&self, rect: &Rect) {
-        self.draw_rect_from_points(rect.start, rect.start.add(rect.size));
+    pub fn draw_rect(&self, rect: &Rect, color_code: u8) {
+        self.draw_rect_from_points(rect.start, rect.start.add(rect.size), color_code);
     }
 
-    pub fn draw_rect_from_points(&self, lhs: I32Point, rhs: I32Point) {
+    pub fn draw_rect_from_points(&self, lhs: I32Point, rhs: I32Point, color_code: u8) {
         let (x_min, y_min, x_max, y_max) = point_pair_minmax(lhs, rhs);
 
+        self.draw_text_to_current_pos(&format!("\x1B[{}m", color_code));
+
         for y in y_min..=y_max {
-            self.draw_text(BLOCK_CHAR, x_min as usize, y as usize);
-            self.draw_text(BLOCK_CHAR, x_max as usize, y as usize);
+            self.draw_text_uncoloured(BLOCK_CHAR, x_min as usize, y as usize);
+            self.draw_text_uncoloured(BLOCK_CHAR, x_max as usize, y as usize);
         }
-        self.draw_text(
+        self.draw_text_uncoloured(
             &BLOCK_CHAR.repeat((x_max - x_min) as usize),
             x_min as usize,
             y_min as usize,
         );
-        self.draw_text(
+        self.draw_text_uncoloured(
             &BLOCK_CHAR.repeat((x_max - x_min) as usize),
             x_min as usize,
             y_max as usize,
         );
+
+        self.draw_text_to_current_pos("\x1B[0m");
     }
 
     pub fn draw_line(&self, line: &Line) {
@@ -297,7 +309,7 @@ impl Gfx {
                 for x in x_min..=x_max {
                     let y = ((diff_y / diff_x) * (x as f32 - start.0 as f32) + start.1 as f32)
                         .round() as usize;
-                    self.draw_text(BLOCK_CHAR, x as usize, y);
+                    self.draw_text_uncoloured(BLOCK_CHAR, x as usize, y);
                 }
             }
         } else {
@@ -305,7 +317,7 @@ impl Gfx {
                 for y in y_min..=y_max {
                     let x = ((diff_x / diff_y) * (y as f32 - start.1 as f32) + start.0 as f32)
                         .round() as usize;
-                    self.draw_text(BLOCK_CHAR, x, y as usize);
+                    self.draw_text_uncoloured(BLOCK_CHAR, x, y as usize);
                 }
             }
         }

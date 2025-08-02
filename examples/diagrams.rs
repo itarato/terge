@@ -13,6 +13,19 @@ type IdType = u64;
 
 const DRAG_STR: &'static str = "+";
 const EDIT_STR: &'static str = "#";
+const COLORS: [(u8, &'static str); 10] = [
+    (39, "Default color"),
+    (31, "Red"),
+    (33, "Yellow"),
+    (90, "Dark gray"),
+    (91, "Light red"),
+    (92, "Light green"),
+    (93, "Light yellow"),
+    (94, "Light blue"),
+    (95, "Light magenta"),
+    (96, "Light cyan"),
+];
+const DEFAULT_COLOR_CODE: u8 = COLORS[0].0;
 
 fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Option<I32Point> {
     let intersections = intersection_of_rect_and_line(rect, line);
@@ -36,6 +49,7 @@ fn draw_text_inside_rectangle(gfx: &mut Gfx, text_obj: &TextObject, rect_obj: &R
             &line,
             mid_x as usize - (line.len() >> 1),
             start_y as usize + i,
+            COLORS[text_obj.color].0,
         );
     }
 }
@@ -88,12 +102,13 @@ impl TextEditor {
 // TODO: Add hover-over highlight
 struct RectObject {
     id: IdType,
+    color: usize,
     rect: Rect,
 }
 
 impl RectObject {
-    fn new(id: IdType, rect: Rect) -> Self {
-        Self { id, rect }
+    fn new(id: IdType, color: usize, rect: Rect) -> Self {
+        Self { id, color, rect }
     }
 
     fn end(&self) -> I32Point {
@@ -131,6 +146,7 @@ struct TextObject {
     start: I32Point,
     lines: Vec<String>,
     anchor_rect_id: Option<IdType>,
+    color: usize,
 }
 
 impl TextObject {
@@ -139,12 +155,14 @@ impl TextObject {
         start: I32Point,
         lines: Vec<String>,
         anchor_rect_id: Option<IdType>,
+        color: usize,
     ) -> Self {
         Self {
             id,
             start,
             lines,
             anchor_rect_id,
+            color,
         }
     }
 
@@ -213,6 +231,7 @@ struct App {
     action: Option<Action>,
     intent: Intent,
     current_mouse_pos: I32Point,
+    current_color: usize,
     rectangles: HashMap<IdType, RectObject>,
     lines: HashMap<IdType, LineObject>,
     texts: HashMap<IdType, TextObject>,
@@ -225,6 +244,7 @@ impl App {
             action: None,
             intent: Intent::Rect,
             current_mouse_pos: (-1, -1),
+            current_color: 0,
             rectangles: HashMap::new(),
             lines: HashMap::new(),
             texts: HashMap::new(),
@@ -281,6 +301,7 @@ impl App {
                     new_id,
                     RectObject::new(
                         new_id,
+                        self.current_color,
                         Rect::new_from_unordered_points(start, self.current_mouse_pos),
                     ),
                 );
@@ -309,8 +330,10 @@ impl App {
                 .map(|rect_obj| rect_obj.id);
 
             let id = self.get_id();
-            self.texts
-                .insert(id, TextObject::new(id, start, editor.lines, anchor_rect_id));
+            self.texts.insert(
+                id,
+                TextObject::new(id, start, editor.lines, anchor_rect_id, self.current_color),
+            );
             self.action = None;
         } else {
             unreachable!("Must be text action mode")
@@ -450,6 +473,10 @@ impl App {
             self.start_action((mouse_event.column as i32, mouse_event.row as i32));
         }
     }
+
+    fn current_color_code(&self) -> u8 {
+        COLORS[self.current_color].0
+    }
 }
 
 impl terge::App for App {
@@ -457,10 +484,10 @@ impl terge::App for App {
         gfx.clear_screen();
 
         for (_id, rect_obj) in &self.rectangles {
-            gfx.draw_rect(&rect_obj.rect);
+            gfx.draw_rect(&rect_obj.rect, COLORS[rect_obj.color].0);
 
             if rect_obj.end() == self.current_mouse_pos {
-                gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos);
+                gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
             }
         }
 
@@ -468,10 +495,10 @@ impl terge::App for App {
             gfx.draw_line(&line_obj.line);
 
             if line_obj.line.start == self.current_mouse_pos {
-                gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos);
+                gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
             }
             if line_obj.line.end == self.current_mouse_pos {
-                gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos);
+                gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
             }
         }
 
@@ -486,37 +513,49 @@ impl terge::App for App {
                     &text_obj.lines,
                     text_obj.start.0 as usize,
                     text_obj.start.1 as usize,
+                    COLORS[text_obj.color].0,
                 );
             }
 
             if self.is_text_editable_at(text_obj, self.current_mouse_pos) {
-                gfx.draw_text_at_point(EDIT_STR, self.current_mouse_pos);
+                gfx.draw_text_at_point(EDIT_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
             }
         }
 
         if let Some(draw_action) = &self.action {
             match draw_action {
-                Action::Rect { start } => gfx.draw_rect_from_points(*start, self.current_mouse_pos),
+                Action::Rect { start } => gfx.draw_rect_from_points(
+                    *start,
+                    self.current_mouse_pos,
+                    self.current_color_code(),
+                ),
                 Action::Line { start } => gfx.draw_line_from_points(*start, self.current_mouse_pos),
                 Action::DragRectangle { .. } => {}
                 Action::DragLineStart { .. } => {}
                 Action::DragLineEnd { .. } => {}
                 Action::ResizeRectangle { .. } => {}
                 Action::Text { start, editor } => {
-                    gfx.draw_multiline_text(&editor.lines, start.0 as usize, start.1 as usize);
+                    gfx.draw_multiline_text(
+                        &editor.lines,
+                        start.0 as usize,
+                        start.1 as usize,
+                        self.current_color_code(),
+                    );
                     gfx.draw_text_to_current_pos("_");
                 }
             };
         }
 
-        gfx.draw_text(
+        gfx.draw_text_uncoloured(
             &format!(
-                "Intent: {:?} | Active: {:?}",
+                "Intent: {:?} | Active: {} | \x1B[{}m{}\x1B[0m",
                 self.intent,
                 self.action
                     .as_ref()
                     .map(|a| a.to_string_short())
-                    .unwrap_or("-")
+                    .unwrap_or("-"),
+                COLORS[self.current_color as usize].0,
+                COLORS[self.current_color as usize].1
             ),
             0,
             gfx.height - 1,
@@ -562,6 +601,9 @@ impl terge::App for App {
                                     'r' => self.intent = Intent::Rect,
                                     'l' => self.intent = Intent::Line,
                                     't' => self.intent = Intent::Text,
+                                    num_c @ '0'..='9' => {
+                                        self.current_color = (num_c as u8 - b'0') as usize
+                                    }
                                     _ => {}
                                 },
                                 _ => {}
