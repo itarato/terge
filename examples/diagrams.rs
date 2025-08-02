@@ -4,6 +4,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, Mous
 use log::{debug, error};
 use terge::{
     Arithmetics, Gfx, I32Point, Line, Rect, Terge, UsizePoint, intersection_of_rect_and_line,
+    point_pair_minmax,
 };
 
 type IdType = u64;
@@ -21,11 +22,17 @@ fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Option<I3
 }
 
 fn draw_text_inside_rectangle(gfx: &mut Gfx, text_obj: &TextObject, rect_obj: &RectObject) {
-    gfx.draw_multiline_text(
-        &text_obj.lines,
-        rect_obj.rect.start.0 as usize,
-        rect_obj.rect.start.1 as usize,
-    );
+    let start_y =
+        rect_obj.rect.start.1 + (rect_obj.rect.size.1 >> 1) - (text_obj.lines.len() >> 1) as i32;
+    let mid_x = rect_obj.rect.start.0 + (rect_obj.rect.size.0 >> 1);
+
+    for (i, line) in text_obj.lines.iter().enumerate() {
+        gfx.draw_text(
+            &line,
+            mid_x as usize - (line.len() >> 1),
+            start_y as usize + i,
+        );
+    }
 }
 
 struct TextEditor {
@@ -68,6 +75,17 @@ struct RectObject {
 impl RectObject {
     fn new(id: IdType, rect: Rect) -> Self {
         Self { id, rect }
+    }
+
+    fn end(&self) -> I32Point {
+        self.rect.start.add(self.rect.size)
+    }
+
+    fn resize(&mut self, previous_start: I32Point, end: I32Point) {
+        let (min_x, min_y, max_x, max_y) = point_pair_minmax(previous_start, end);
+
+        self.rect.start = (min_x, min_y);
+        self.rect.size = (max_x - min_x, max_y - min_y);
     }
 }
 
@@ -125,9 +143,13 @@ enum Action {
         start: I32Point,
         editor: TextEditor,
     },
-    DragAndDrop {
+    DragRectangle {
         rectangle_id: IdType,
         offset: I32Point,
+    },
+    ResizeRectangle {
+        rectangle_id: IdType,
+        orig_start: I32Point,
     },
 }
 
@@ -144,7 +166,8 @@ impl Action {
             Action::Line { .. } => "line",
             Action::Rect { .. } => "rect",
             Action::Text { .. } => "text",
-            Action::DragAndDrop { .. } => "drag and drop",
+            Action::DragRectangle { .. } => "drag rectangle",
+            Action::ResizeRectangle { .. } => "resize rectangle",
         }
     }
 }
@@ -230,7 +253,9 @@ impl App {
             );
 
             self.action = None;
-        } else if let Some(Action::DragAndDrop { .. }) = self.action {
+        } else if let Some(Action::DragRectangle { .. }) = self.action {
+            self.action = None;
+        } else if let Some(Action::ResizeRectangle { .. }) = self.action {
             self.action = None;
         }
     }
@@ -253,6 +278,16 @@ impl App {
     fn rectangle_header_under_point(&self, p: I32Point) -> Option<&RectObject> {
         for (_id, rect_obj) in &self.rectangles {
             if rect_obj.rect.is_point_on_header(p) {
+                return Some(rect_obj);
+            }
+        }
+
+        None
+    }
+
+    fn rectangle_resize_point_under_point(&self, p: I32Point) -> Option<&RectObject> {
+        for (_id, rect_obj) in &self.rectangles {
+            if rect_obj.end() == p {
                 return Some(rect_obj);
             }
         }
@@ -309,7 +344,8 @@ impl terge::App for App {
             match draw_action {
                 Action::Rect { start } => gfx.draw_rect_from_points(*start, self.current_mouse_pos),
                 Action::Line { start } => gfx.draw_line_from_points(*start, self.current_mouse_pos),
-                Action::DragAndDrop { .. } => {}
+                Action::DragRectangle { .. } => {}
+                Action::ResizeRectangle { .. } => {}
                 Action::Text { start, editor } => {
                     gfx.draw_multiline_text(&editor.lines, start.0 as usize, start.1 as usize);
                 }
@@ -345,9 +381,16 @@ impl terge::App for App {
                         if let Some(rect_obj) =
                             self.rectangle_header_under_point(self.current_mouse_pos)
                         {
-                            self.action = Some(Action::DragAndDrop {
+                            self.action = Some(Action::DragRectangle {
                                 rectangle_id: rect_obj.id,
                                 offset: self.current_mouse_pos.sub(rect_obj.rect.start),
+                            });
+                        } else if let Some(rect_obj) =
+                            self.rectangle_resize_point_under_point(self.current_mouse_pos)
+                        {
+                            self.action = Some(Action::ResizeRectangle {
+                                rectangle_id: rect_obj.id,
+                                orig_start: rect_obj.rect.start,
                             });
                         } else {
                             self.start_action((mouse_event.column as i32, mouse_event.row as i32));
@@ -389,7 +432,8 @@ impl terge::App for App {
             }
         }
 
-        if let Some(Action::DragAndDrop {
+        // Active actions.
+        if let Some(Action::DragRectangle {
             rectangle_id,
             offset,
         }) = self.action
@@ -397,6 +441,14 @@ impl terge::App for App {
             self.rectangles
                 .get_mut(&rectangle_id)
                 .map(|rect_obj| rect_obj.rect.start = self.current_mouse_pos.sub(offset));
+        } else if let Some(Action::ResizeRectangle {
+            rectangle_id,
+            orig_start,
+        }) = self.action
+        {
+            self.rectangles
+                .get_mut(&rectangle_id)
+                .map(|rect_obj| rect_obj.resize(orig_start, self.current_mouse_pos));
         }
 
         for (_id, line_obj) in self.lines.iter_mut() {
