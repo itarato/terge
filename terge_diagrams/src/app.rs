@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crossterm::event::KeyEvent;
 use crossterm::event::{Event, KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use log::{debug, error};
 use terge::{Arithmetics, I32Point, Line, Rect};
@@ -291,6 +292,14 @@ impl App {
             return;
         }
     }
+
+    fn text_edit_mode_update(&mut self, key_event: &KeyEvent) {
+        if let Some(Action::Text { editor, .. }) = self.action.as_mut() {
+            editor.edit(&key_event);
+        } else {
+            unreachable!("Must be text action");
+        }
+    }
 }
 
 impl terge::App for App {
@@ -393,17 +402,10 @@ impl terge::App for App {
                 Event::Key(key_event) => {
                     if key_event.is_press() {
                         if self.is_active_action_text() {
-                            if key_event.code == KeyCode::Enter
-                                && !key_event.modifiers.contains(KeyModifiers::ALT)
-                            {
-                                debug!("END {:?}", key_event);
+                            if key_event.is_enter_without_alt() {
                                 self.end_text_mode();
                             } else {
-                                if let Some(Action::Text { editor, .. }) = self.action.as_mut() {
-                                    editor.edit(&key_event);
-                                } else {
-                                    unreachable!("Must be text action");
-                                }
+                                self.text_edit_mode_update(&key_event);
                             }
                         } else {
                             match key_event.code {

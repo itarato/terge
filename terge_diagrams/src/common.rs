@@ -1,3 +1,4 @@
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use terge::{I32Point, Line, Rect, intersection_of_rect_and_line};
 
 use crate::text_editor::TextEditor;
@@ -85,4 +86,14 @@ pub fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Optio
     }
 
     None
+}
+
+pub(crate) trait KeyEventUtil {
+    fn is_enter_without_alt(&self) -> bool;
+}
+
+impl KeyEventUtil for KeyEvent {
+    fn is_enter_without_alt(&self) -> bool {
+        self.code == KeyCode::Enter && !self.modifiers.contains(KeyModifiers::ALT)
+    }
 }
