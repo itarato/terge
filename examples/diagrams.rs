@@ -39,21 +39,6 @@ fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Option<I3
     None
 }
 
-fn draw_text_inside_rectangle(gfx: &mut Gfx, text_obj: &TextObject, rect_obj: &RectObject) {
-    let start_y =
-        rect_obj.rect.start.1 + (rect_obj.rect.size.1 >> 1) - (text_obj.lines.len() >> 1) as i32;
-    let mid_x = rect_obj.rect.start.0 + (rect_obj.rect.size.0 >> 1);
-
-    for (i, line) in text_obj.lines.iter().enumerate() {
-        gfx.draw_text(
-            &line,
-            mid_x as usize - (line.len() >> 1),
-            start_y as usize + i,
-            COLORS[text_obj.color].0,
-        );
-    }
-}
-
 struct TextEditor {
     cursor: UsizePoint,
     lines: Vec<String>,
@@ -168,6 +153,29 @@ impl TextObject {
 
     fn is_edit_point(&self, p: I32Point) -> bool {
         self.start == p
+    }
+
+    fn draw(&self, gfx: &Gfx) {
+        if self.anchor_rect_id.is_some() {
+            let mid_x = self.start.0;
+            let start_y = self.start.1 - (self.lines.len() >> 1) as i32;
+
+            for (i, line) in self.lines.iter().enumerate() {
+                gfx.draw_text(
+                    &line,
+                    mid_x as usize - (line.len() >> 1),
+                    start_y as usize + i,
+                    COLORS[self.color].0,
+                );
+            }
+        } else {
+            gfx.draw_multiline_text(
+                &self.lines,
+                self.start.0 as usize,
+                self.start.1 as usize,
+                COLORS[self.color].0,
+            );
+        }
     }
 }
 
@@ -477,6 +485,37 @@ impl App {
     fn current_color_code(&self) -> u8 {
         COLORS[self.current_color].0
     }
+
+    fn delete_under_point(&mut self, p: I32Point) {
+        let mut done = false;
+
+        self.rectangles.retain(|_, rect_obj| {
+            if !done && rect_obj.rect.is_point_on(p) {
+                done = true;
+                false
+            } else {
+                true
+            }
+        });
+        // TODO cleanup dangling rect ids from lines and texts.
+
+        if done {
+            return;
+        }
+
+        self.lines.retain(|_, line_obj| {
+            if !done && line_obj.line.is_point_on(p) {
+                done = true;
+                false
+            } else {
+                true
+            }
+        });
+
+        if done {
+            return;
+        }
+    }
 }
 
 impl terge::App for App {
@@ -503,19 +542,7 @@ impl terge::App for App {
         }
 
         for (_id, text_obj) in &self.texts {
-            if let Some(rect_obj) = text_obj
-                .anchor_rect_id
-                .and_then(|id| self.rectangles.get(&id))
-            {
-                draw_text_inside_rectangle(gfx, text_obj, rect_obj);
-            } else {
-                gfx.draw_multiline_text(
-                    &text_obj.lines,
-                    text_obj.start.0 as usize,
-                    text_obj.start.1 as usize,
-                    COLORS[text_obj.color].0,
-                );
-            }
+            text_obj.draw(&gfx);
 
             if self.is_text_editable_at(text_obj, self.current_mouse_pos) {
                 gfx.draw_text_at_point(EDIT_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
@@ -606,6 +633,7 @@ impl terge::App for App {
                                     }
                                     _ => {}
                                 },
+                                KeyCode::Delete => self.delete_under_point(self.current_mouse_pos),
                                 _ => {}
                             }
                         }
@@ -665,6 +693,16 @@ impl terge::App for App {
                 {
                     line_obj.line.end = intersection;
                 }
+            }
+        }
+
+        for (_id, text_obj) in self.texts.iter_mut() {
+            if let Some(p) = text_obj
+                .anchor_rect_id
+                .and_then(|id| self.rectangles.get(&id))
+                .map(|rect_obj| rect_obj.rect.midpoint())
+            {
+                text_obj.start = p;
             }
         }
 
