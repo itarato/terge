@@ -83,7 +83,6 @@ impl TextEditor {
     }
 }
 
-// TODO: Add color
 // TODO: Add hover-over highlight
 struct RectObject {
     id: IdType,
@@ -113,15 +112,17 @@ struct LineObject {
     line: Line,
     start_anchor_rect_id: Option<IdType>,
     end_anchor_rect_id: Option<IdType>,
+    color: usize,
 }
 
 impl LineObject {
-    fn new(id: IdType, line: Line) -> Self {
+    fn new(id: IdType, line: Line, color: usize) -> Self {
         Self {
             id,
             line,
             start_anchor_rect_id: None,
             end_anchor_rect_id: None,
+            color,
         }
     }
 }
@@ -158,12 +159,12 @@ impl TextObject {
     fn draw(&self, gfx: &Gfx) {
         if self.anchor_rect_id.is_some() {
             let mid_x = self.start.0;
-            let start_y = self.start.1 - (self.lines.len() >> 1) as i32;
+            let start_y = self.start.1 - (self.lines.len() / 2) as i32;
 
             for (i, line) in self.lines.iter().enumerate() {
                 gfx.draw_text(
                     &line,
-                    mid_x as usize - (line.len() >> 1),
+                    mid_x as usize - (line.len() / 2),
                     start_y as usize + i,
                     COLORS[self.color].0,
                 );
@@ -295,6 +296,7 @@ impl App {
                             start,
                             end: self.current_mouse_pos,
                         },
+                        self.current_color,
                     ),
                 );
 
@@ -446,14 +448,7 @@ impl App {
     }
 
     fn on_left_mouse_button_down(&mut self, mouse_event: &MouseEvent) {
-        if let Some(rect_obj) = self.rectangle_header_under_point(self.current_mouse_pos) {
-            self.action = Some(Action::DragRectangle {
-                rectangle_id: rect_obj.id,
-                offset: self.current_mouse_pos.sub(rect_obj.rect.start),
-            });
-        } else if let Some(rect_obj) =
-            self.rectangle_resize_point_under_point(self.current_mouse_pos)
-        {
+        if let Some(rect_obj) = self.rectangle_resize_point_under_point(self.current_mouse_pos) {
             self.action = Some(Action::ResizeRectangle {
                 rectangle_id: rect_obj.id,
                 orig_start: rect_obj.rect.start,
@@ -477,6 +472,11 @@ impl App {
             });
 
             self.texts.remove(&id);
+        } else if let Some(rect_obj) = self.rectangle_header_under_point(self.current_mouse_pos) {
+            self.action = Some(Action::DragRectangle {
+                rectangle_id: rect_obj.id,
+                offset: self.current_mouse_pos.sub(rect_obj.rect.start),
+            });
         } else {
             self.start_action((mouse_event.column as i32, mouse_event.row as i32));
         }
@@ -531,7 +531,7 @@ impl terge::App for App {
         }
 
         for (_id, line_obj) in &self.lines {
-            gfx.draw_line(&line_obj.line);
+            gfx.draw_line(&line_obj.line, COLORS[line_obj.color].0);
 
             if line_obj.line.start == self.current_mouse_pos {
                 gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
@@ -556,7 +556,11 @@ impl terge::App for App {
                     self.current_mouse_pos,
                     self.current_color_code(),
                 ),
-                Action::Line { start } => gfx.draw_line_from_points(*start, self.current_mouse_pos),
+                Action::Line { start } => gfx.draw_line_from_points(
+                    *start,
+                    self.current_mouse_pos,
+                    self.current_color_code(),
+                ),
                 Action::DragRectangle { .. } => {}
                 Action::DragLineStart { .. } => {}
                 Action::DragLineEnd { .. } => {}

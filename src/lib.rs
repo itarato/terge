@@ -377,14 +377,18 @@ impl Gfx {
         self.draw_text_to_current_pos("\x1B[0m");
     }
 
-    pub fn draw_line(&self, line: &Line) {
-        self.draw_line_from_points(line.start, line.end);
+    pub fn draw_line(&self, line: &Line, color: u8) {
+        self.draw_line_from_points(line.start, line.end, color);
     }
 
-    pub fn draw_line_from_points(&self, start: I32Point, end: I32Point) {
+    pub fn draw_line_from_points(&self, start: I32Point, end: I32Point, color: u8) {
+        self.draw_text_to_current_pos(&format!("\x1B[{}m", color));
+
         for (x, y) in LinePointsIterator::new(start, end) {
             self.draw_text_uncoloured(BLOCK_CHAR, x as usize, y as usize);
         }
+
+        self.draw_text_to_current_pos("\x1B[0m");
     }
 }
 
