@@ -79,11 +79,27 @@ impl Gfx {
         self.draw_text_to_current_pos(&format!("\x1B[{}m", color_code));
 
         for y in y_min..=y_max {
-            self.draw_text_uncoloured(BLOCK_CHAR, x_min, y);
-            self.draw_text_uncoloured(BLOCK_CHAR, x_max, y);
+            self.draw_text_uncoloured(BOX_VERTICAL_CHAR, x_min, y);
+            self.draw_text_uncoloured(BOX_VERTICAL_CHAR, x_max, y);
         }
-        self.draw_text_uncoloured(&BLOCK_CHAR.repeat((x_max - x_min) as usize), x_min, y_min);
-        self.draw_text_uncoloured(&BLOCK_CHAR.repeat((x_max - x_min) as usize), x_min, y_max);
+
+        if x_max - x_min >= 2 {
+            self.draw_text_uncoloured(
+                &BOX_HORIZONTAL_CHAR.repeat((x_max - x_min - 1) as usize),
+                x_min + 1,
+                y_min,
+            );
+            self.draw_text_uncoloured(
+                &BOX_HORIZONTAL_CHAR.repeat((x_max - x_min - 1) as usize),
+                x_min + 1,
+                y_max,
+            );
+        }
+
+        self.draw_text_uncoloured(BOX_TOP_LEFT_CORNER_CHAR, x_min, y_min);
+        self.draw_text_uncoloured(BOX_TOP_RIGTH_CORNER_CHAR, x_max, y_min);
+        self.draw_text_uncoloured(BOX_BOTTOM_LEFT_CORNER_CHAR, x_min, y_max);
+        self.draw_text_uncoloured(BOX_BOTTOM_RIGTH_CORNER_CHAR, x_max, y_max);
 
         self.draw_text_to_current_pos("\x1B[0m");
     }
@@ -98,6 +114,9 @@ impl Gfx {
         for (x, y) in LinePointsIterator::new(start, end) {
             self.draw_text_uncoloured(BLOCK_CHAR, x, y);
         }
+
+        self.draw_text_uncoloured(LINE_CONNECTION_CHAR, start.0, start.1);
+        self.draw_text_uncoloured(LINE_CONNECTION_CHAR, end.0, end.1);
 
         self.draw_text_to_current_pos("\x1B[0m");
     }

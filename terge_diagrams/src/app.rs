@@ -327,9 +327,11 @@ impl App {
                 offset,
             }) => {
                 self.rectangles.get_mut(&rectangle_id).map(|rect_obj| {
-                    rect_obj.rect.start = i32point_to_u16point(
-                        u16point_to_i32point(self.current_mouse_pos).sub(*offset),
-                    )
+                    let mut new_pos = u16point_to_i32point(self.current_mouse_pos).sub(*offset);
+                    if new_pos.0 < 0 {
+                        new_pos.0 = 0;
+                    }
+                    rect_obj.rect.start = i32point_to_u16point(new_pos)
                 });
             }
             Some(Action::ResizeRectangle {

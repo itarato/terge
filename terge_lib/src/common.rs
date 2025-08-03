@@ -1,6 +1,13 @@
 use crate::{Rect, line::Line};
 
-pub const BLOCK_CHAR: &'static str = "█";
+pub const BLOCK_CHAR: &'static str = "░";
+pub const BOX_TOP_LEFT_CORNER_CHAR: &'static str = "╔";
+pub const BOX_TOP_RIGTH_CORNER_CHAR: &'static str = "╗";
+pub const BOX_BOTTOM_LEFT_CORNER_CHAR: &'static str = "╚";
+pub const BOX_BOTTOM_RIGTH_CORNER_CHAR: &'static str = "╝";
+pub const BOX_VERTICAL_CHAR: &'static str = "║";
+pub const BOX_HORIZONTAL_CHAR: &'static str = "═";
+pub const LINE_CONNECTION_CHAR: &'static str = "X";
 pub const DEFAULT_COLOR_CODE: u8 = 0;
 
 pub type I32Point = (i32, i32);
