@@ -1,5 +1,5 @@
 use terge::{
-    common::{Arithmetics, I32Point, point_pair_minmax},
+    common::{Arithmetics, U16Point, point_pair_minmax},
     rect::Rect,
 };
 
@@ -17,11 +17,7 @@ impl RectObject {
         Self { id, color, rect }
     }
 
-    pub fn end(&self) -> I32Point {
-        self.rect.start.add(self.rect.size)
-    }
-
-    pub fn resize(&mut self, previous_start: I32Point, end: I32Point) {
+    pub fn resize(&mut self, previous_start: U16Point, end: U16Point) {
         let (min_x, min_y, max_x, max_y) = point_pair_minmax(previous_start, end);
 
         self.rect.start = (min_x, min_y);

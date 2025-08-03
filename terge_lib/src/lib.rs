@@ -116,8 +116,8 @@ impl Terge {
                         }
                     }
                     Event::Resize(width, height) => {
-                        self.gfx.width = *width as usize;
-                        self.gfx.height = *height as usize;
+                        self.gfx.width = *width;
+                        self.gfx.height = *height;
                     }
                     _ => {}
                 }

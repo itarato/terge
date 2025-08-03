@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crossterm::event::KeyEvent;
 use crossterm::event::{Event, KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use log::error;
-use terge::common::{Arithmetics, I32Point};
+use terge::common::{Arithmetics, I32Point, U16Point, i32point_to_u16point, u16point_to_i32point};
 use terge::event_group::EventGroup;
 use terge::gfx::Gfx;
 use terge::line::Line;
@@ -19,7 +19,7 @@ pub struct App {
     id_provider: u64,
     action: Option<Action>,
     intent: Intent,
-    current_mouse_pos: I32Point,
+    current_mouse_pos: U16Point,
     current_color: usize,
     rectangles: HashMap<IdType, RectObject>,
     lines: HashMap<IdType, LineObject>,
@@ -32,7 +32,7 @@ impl App {
             id_provider: 0,
             action: None,
             intent: Intent::Rect,
-            current_mouse_pos: (-1, -1),
+            current_mouse_pos: (0, 0),
             current_color: 0,
             rectangles: HashMap::new(),
             lines: HashMap::new(),
@@ -45,7 +45,7 @@ impl App {
         self.id_provider
     }
 
-    fn start_action(&mut self, start: I32Point) {
+    fn start_action(&mut self, start: U16Point) {
         if self.action.is_some() {
             error!("Starting draw mode when there is already one.");
             return;
@@ -152,7 +152,7 @@ impl App {
             .map(|line_obj| line_obj.end_anchor_rect_id = anchor);
     }
 
-    fn rectangle_header_under_point(&self, p: I32Point) -> Option<&RectObject> {
+    fn rectangle_header_under_point(&self, p: U16Point) -> Option<&RectObject> {
         for (_id, rect_obj) in &self.rectangles {
             if rect_obj.rect.is_point_on_header(p) {
                 return Some(rect_obj);
@@ -162,9 +162,9 @@ impl App {
         None
     }
 
-    fn rectangle_resize_point_under_point(&self, p: I32Point) -> Option<&RectObject> {
+    fn rectangle_resize_point_under_point(&self, p: U16Point) -> Option<&RectObject> {
         for (_id, rect_obj) in &self.rectangles {
-            if rect_obj.end() == p {
+            if rect_obj.rect.end() == p {
                 return Some(rect_obj);
             }
         }
@@ -172,7 +172,7 @@ impl App {
         None
     }
 
-    fn rectangle_under_point(&self, p: I32Point) -> Option<&RectObject> {
+    fn rectangle_under_point(&self, p: U16Point) -> Option<&RectObject> {
         for (_id, rect_obj) in &self.rectangles {
             if rect_obj.rect.is_point_on(p) {
                 return Some(rect_obj);
@@ -182,7 +182,7 @@ impl App {
         None
     }
 
-    fn is_text_editable_at(&self, text_obj: &TextObject, p: I32Point) -> bool {
+    fn is_text_editable_at(&self, text_obj: &TextObject, p: U16Point) -> bool {
         if let Some(rect_obj) = text_obj
             .anchor_rect_id
             .and_then(|id| self.rectangles.get(&id))
@@ -193,7 +193,7 @@ impl App {
         }
     }
 
-    fn text_under_point(&self, p: I32Point) -> Option<&TextObject> {
+    fn text_under_point(&self, p: U16Point) -> Option<&TextObject> {
         for (_id, text_obj) in &self.texts {
             if self.is_text_editable_at(text_obj, p) {
                 return Some(text_obj);
@@ -202,7 +202,7 @@ impl App {
         None
     }
 
-    fn line_with_start_under_point(&mut self, p: I32Point) -> Option<&mut LineObject> {
+    fn line_with_start_under_point(&mut self, p: U16Point) -> Option<&mut LineObject> {
         for (_id, line_obj) in &mut self.lines {
             if line_obj.line.start == p {
                 return Some(line_obj);
@@ -211,7 +211,7 @@ impl App {
         None
     }
 
-    fn line_with_end_under_point(&mut self, p: I32Point) -> Option<&mut LineObject> {
+    fn line_with_end_under_point(&mut self, p: U16Point) -> Option<&mut LineObject> {
         for (_id, line_obj) in &mut self.lines {
             if line_obj.line.end == p {
                 return Some(line_obj);
@@ -255,10 +255,11 @@ impl App {
         } else if let Some(rect_obj) = self.rectangle_header_under_point(self.current_mouse_pos) {
             self.action = Some(Action::DragRectangle {
                 rectangle_id: rect_obj.id,
-                offset: self.current_mouse_pos.sub(rect_obj.rect.start),
+                offset: u16point_to_i32point(self.current_mouse_pos)
+                    .sub(u16point_to_i32point(rect_obj.rect.start)),
             });
         } else {
-            self.start_action((mouse_event.column as i32, mouse_event.row as i32));
+            self.start_action((mouse_event.column, mouse_event.row));
         }
     }
 
@@ -266,7 +267,7 @@ impl App {
         COLORS[self.current_color].0
     }
 
-    fn delete_under_point(&mut self, p: I32Point) {
+    fn delete_under_point(&mut self, p: U16Point) {
         let mut done = false;
 
         self.rectangles.retain(|_, rect_obj| {
@@ -325,9 +326,11 @@ impl App {
                 rectangle_id,
                 offset,
             }) => {
-                self.rectangles
-                    .get_mut(&rectangle_id)
-                    .map(|rect_obj| rect_obj.rect.start = self.current_mouse_pos.sub(*offset));
+                self.rectangles.get_mut(&rectangle_id).map(|rect_obj| {
+                    rect_obj.rect.start = i32point_to_u16point(
+                        u16point_to_i32point(self.current_mouse_pos).sub(*offset),
+                    )
+                });
             }
             Some(Action::ResizeRectangle {
                 rectangle_id,
@@ -408,7 +411,7 @@ impl terge::App for App {
         for (_id, rect_obj) in &self.rectangles {
             gfx.draw_rect(&rect_obj.rect, COLORS[rect_obj.color].0);
 
-            if rect_obj.end() == self.current_mouse_pos {
+            if rect_obj.rect.end() == self.current_mouse_pos {
                 gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
             }
         }
@@ -451,8 +454,8 @@ impl terge::App for App {
                 Action::Text { start, editor } => {
                     gfx.draw_multiline_text(
                         &editor.lines,
-                        start.0 as usize,
-                        start.1 as usize,
+                        start.0,
+                        start.1,
                         self.current_color_code(),
                     );
                     gfx.draw_text_to_current_pos("_");
@@ -461,7 +464,7 @@ impl terge::App for App {
         }
 
         gfx.draw_text_to_current_pos("\x1B[100m");
-        gfx.draw_text_uncoloured(&" ".repeat(gfx.width), 0, gfx.height - 1);
+        gfx.draw_text_uncoloured(&" ".repeat(gfx.width as usize), 0, gfx.height - 1);
         gfx.draw_text_to_current_pos("\x1B[0m");
 
         gfx.draw_text_uncoloured(
@@ -484,8 +487,7 @@ impl terge::App for App {
 
     fn update(&mut self, events: &EventGroup, _gfx: &mut Gfx) -> bool {
         if let Some(last_mouse_pos) = events.last_mouse_pos() {
-            self.current_mouse_pos.0 = last_mouse_pos.0 as i32;
-            self.current_mouse_pos.1 = last_mouse_pos.1 as i32;
+            self.current_mouse_pos = last_mouse_pos;
         }
 
         for e in &events.events {

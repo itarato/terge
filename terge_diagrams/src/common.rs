@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use terge::{
-    common::{I32Point, intersection_of_rect_and_line},
+    common::{I32Point, U16Point, intersection_of_rect_and_line},
     line::Line,
     rect::Rect,
 };
@@ -34,13 +34,13 @@ pub enum Intent {
 
 pub enum Action {
     Line {
-        start: I32Point,
+        start: U16Point,
     },
     Rect {
-        start: I32Point,
+        start: U16Point,
     },
     Text {
-        start: I32Point,
+        start: U16Point,
         editor: TextEditor,
     },
     DragRectangle {
@@ -55,7 +55,7 @@ pub enum Action {
     },
     ResizeRectangle {
         rectangle_id: IdType,
-        orig_start: I32Point,
+        orig_start: U16Point,
     },
 }
 
@@ -80,7 +80,7 @@ impl Action {
     }
 }
 
-pub fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Option<I32Point> {
+pub fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Option<U16Point> {
     let intersections = intersection_of_rect_and_line(rect, line);
 
     for p in intersections {

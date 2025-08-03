@@ -3,20 +3,20 @@ use std::ops;
 use crate::common::*;
 
 pub struct LinePointsIterator {
-    x_max: i32,
-    y_max: i32,
+    x_max: u16,
+    y_max: u16,
     diff_x: f32,
     diff_y: f32,
-    start: I32Point,
-    i: i32,
+    start: U16Point,
+    i: u16,
 }
 
 impl LinePointsIterator {
-    pub fn new(lhs: I32Point, rhs: I32Point) -> Self {
+    pub fn new(lhs: U16Point, rhs: U16Point) -> Self {
         let (x_min, y_min, x_max, y_max) = point_pair_minmax(lhs, rhs);
 
-        let diff_x = (rhs.0 - lhs.0) as f32;
-        let diff_y = (rhs.1 - lhs.1) as f32;
+        let diff_x = (rhs.0 as i32 - lhs.0 as i32) as f32;
+        let diff_y = (rhs.1 as i32 - lhs.1 as i32) as f32;
 
         let i = if diff_x.abs() >= diff_y.abs() {
             x_min
@@ -36,7 +36,7 @@ impl LinePointsIterator {
 }
 
 impl Iterator for LinePointsIterator {
-    type Item = I32Point;
+    type Item = U16Point;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.diff_x.abs() >= self.diff_y.abs() {
@@ -50,9 +50,9 @@ impl Iterator for LinePointsIterator {
 
                 let y = ((self.diff_y / self.diff_x) * (x as f32 - self.start.0 as f32)
                     + self.start.1 as f32)
-                    .round() as usize;
+                    .round() as u16;
 
-                return Some((x, y as i32));
+                return Some((x, y));
             }
         } else {
             if self.diff_y != 0.0 {
@@ -65,8 +65,8 @@ impl Iterator for LinePointsIterator {
 
                 let x = ((self.diff_x / self.diff_y) * (y as f32 - self.start.1 as f32)
                     + self.start.0 as f32)
-                    .round() as usize;
-                return Some((x as i32, y));
+                    .round() as u16;
+                return Some((x, y));
             }
         }
 
@@ -76,26 +76,26 @@ impl Iterator for LinePointsIterator {
 
 #[derive(Debug)]
 pub struct Line {
-    pub start: I32Point,
-    pub end: I32Point,
+    pub start: U16Point,
+    pub end: U16Point,
 }
 
 impl Line {
     pub fn slope(&self) -> f32 {
-        let dx = self.end.0 - self.start.0;
-        let dy = self.end.1 - self.start.1;
+        let dx = self.end.0 as i32 - self.start.0 as i32;
+        let dy = self.end.1 as i32 - self.start.1 as i32;
         dy as f32 / dx as f32
     }
 
-    pub fn x_range(&self) -> ops::RangeInclusive<i32> {
+    pub fn x_range(&self) -> ops::RangeInclusive<u16> {
         self.start.0.min(self.end.0)..=self.start.0.max(self.end.0)
     }
 
-    pub fn y_range(&self) -> ops::RangeInclusive<i32> {
+    pub fn y_range(&self) -> ops::RangeInclusive<u16> {
         self.start.1.min(self.end.1)..=self.start.1.max(self.end.1)
     }
 
-    pub fn is_point_on(&self, p: I32Point) -> bool {
+    pub fn is_point_on(&self, p: U16Point) -> bool {
         for line_point in self.iter() {
             if line_point == p {
                 return true;
