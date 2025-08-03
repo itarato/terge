@@ -1,4 +1,3 @@
-use log::debug;
 use terge::{EventGroup, Gfx, Terge};
 
 struct App {
@@ -34,13 +33,6 @@ impl terge::App for App {
             gfx.width / 2 - 4,
             gfx.height / 2,
         );
-
-        if let Some(ch) = self.ch {
-            debug!("Print char: {}", ch);
-            gfx.draw_text_uncoloured(&ch.to_string(), gfx.width / 2, gfx.height / 2 + 2);
-        } else {
-            debug!("NO CHAR");
-        }
     }
 
     fn update(&mut self, events: &EventGroup, _gfx: &mut Gfx) -> bool {
