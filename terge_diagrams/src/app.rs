@@ -300,6 +300,20 @@ impl App {
             unreachable!("Must be text action");
         }
     }
+
+    fn on_key_press_not_edit_mode(&mut self, key_code: &KeyCode) {
+        match *key_code {
+            KeyCode::Char(c) => match c {
+                'r' => self.intent = Intent::Rect,
+                'l' => self.intent = Intent::Line,
+                't' => self.intent = Intent::Text,
+                num_c @ '0'..='9' => self.current_color = (num_c as u8 - b'0') as usize,
+                _ => {}
+            },
+            KeyCode::Delete => self.delete_under_point(self.current_mouse_pos),
+            _ => {}
+        }
+    }
 }
 
 impl terge::App for App {
@@ -408,19 +422,7 @@ impl terge::App for App {
                                 self.text_edit_mode_update(&key_event);
                             }
                         } else {
-                            match key_event.code {
-                                KeyCode::Char(c) => match c {
-                                    'r' => self.intent = Intent::Rect,
-                                    'l' => self.intent = Intent::Line,
-                                    't' => self.intent = Intent::Text,
-                                    num_c @ '0'..='9' => {
-                                        self.current_color = (num_c as u8 - b'0') as usize
-                                    }
-                                    _ => {}
-                                },
-                                KeyCode::Delete => self.delete_under_point(self.current_mouse_pos),
-                                _ => {}
-                            }
+                            self.on_key_press_not_edit_mode(&key_event.code);
                         }
                     }
                 }
