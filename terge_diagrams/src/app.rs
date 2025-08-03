@@ -314,6 +314,87 @@ impl App {
             _ => {}
         }
     }
+
+    fn on_update_current_action(&mut self) {
+        match &self.action {
+            Some(Action::DragRectangle {
+                rectangle_id,
+                offset,
+            }) => {
+                self.rectangles
+                    .get_mut(&rectangle_id)
+                    .map(|rect_obj| rect_obj.rect.start = self.current_mouse_pos.sub(*offset));
+            }
+            Some(Action::ResizeRectangle {
+                rectangle_id,
+                orig_start,
+            }) => {
+                self.rectangles
+                    .get_mut(&rectangle_id)
+                    .map(|rect_obj| rect_obj.resize(*orig_start, self.current_mouse_pos));
+            }
+            Some(Action::DragLineStart { line_id }) => {
+                self.lines
+                    .get_mut(&line_id)
+                    .map(|line_obj| line_obj.line.start = self.current_mouse_pos);
+            }
+            Some(Action::DragLineEnd { line_id }) => {
+                self.lines
+                    .get_mut(&line_id)
+                    .map(|line_obj| line_obj.line.end = self.current_mouse_pos);
+            }
+            Some(Action::Rect { .. })
+            | Some(Action::Text { .. })
+            | Some(Action::Line { .. })
+            | None => {}
+        }
+    }
+
+    fn on_update_lines_state(&mut self) {
+        for (_id, line_obj) in self.lines.iter_mut() {
+            if let Some(rect_obj) = line_obj
+                .start_anchor_rect_id
+                .and_then(|rect_id| self.rectangles.get(&rect_id))
+            {
+                line_obj.line.start = rect_obj.rect.midpoint();
+                if let Some(intersection) =
+                    intersection_of_rect_and_anchored_line(&rect_obj.rect, &line_obj.line)
+                {
+                    line_obj.line.start = intersection;
+                }
+            }
+
+            if let Some(rect_obj) = line_obj
+                .end_anchor_rect_id
+                .and_then(|rect_id| self.rectangles.get(&rect_id))
+            {
+                line_obj.line.end = rect_obj.rect.midpoint();
+                if let Some(intersection) =
+                    intersection_of_rect_and_anchored_line(&rect_obj.rect, &line_obj.line)
+                {
+                    line_obj.line.end = intersection;
+                }
+            }
+        }
+    }
+
+    fn on_update_text_state(&mut self) {
+        for (_id, text_obj) in self.texts.iter_mut() {
+            if let Some(p) = text_obj
+                .anchor_rect_id
+                .and_then(|id| self.rectangles.get(&id))
+                .map(|rect_obj| rect_obj.rect.midpoint())
+            {
+                text_obj.start = p;
+            }
+        }
+    }
+
+    fn on_update(&mut self) {
+        self.on_update_current_action();
+        self.on_update_lines_state();
+        self.on_update_text_state();
+    }
 }
 
 impl terge::App for App {
@@ -430,68 +511,7 @@ impl terge::App for App {
             }
         }
 
-        // Active actions.
-        if let Some(Action::DragRectangle {
-            rectangle_id,
-            offset,
-        }) = self.action
-        {
-            self.rectangles
-                .get_mut(&rectangle_id)
-                .map(|rect_obj| rect_obj.rect.start = self.current_mouse_pos.sub(offset));
-        } else if let Some(Action::ResizeRectangle {
-            rectangle_id,
-            orig_start,
-        }) = self.action
-        {
-            self.rectangles
-                .get_mut(&rectangle_id)
-                .map(|rect_obj| rect_obj.resize(orig_start, self.current_mouse_pos));
-        } else if let Some(Action::DragLineStart { line_id }) = self.action {
-            self.lines
-                .get_mut(&line_id)
-                .map(|line_obj| line_obj.line.start = self.current_mouse_pos);
-        } else if let Some(Action::DragLineEnd { line_id }) = self.action {
-            self.lines
-                .get_mut(&line_id)
-                .map(|line_obj| line_obj.line.end = self.current_mouse_pos);
-        }
-
-        for (_id, line_obj) in self.lines.iter_mut() {
-            if let Some(rect_obj) = line_obj
-                .start_anchor_rect_id
-                .and_then(|rect_id| self.rectangles.get(&rect_id))
-            {
-                line_obj.line.start = rect_obj.rect.midpoint();
-                if let Some(intersection) =
-                    intersection_of_rect_and_anchored_line(&rect_obj.rect, &line_obj.line)
-                {
-                    line_obj.line.start = intersection;
-                }
-            }
-
-            if let Some(rect_obj) = line_obj
-                .end_anchor_rect_id
-                .and_then(|rect_id| self.rectangles.get(&rect_id))
-            {
-                line_obj.line.end = rect_obj.rect.midpoint();
-                if let Some(intersection) =
-                    intersection_of_rect_and_anchored_line(&rect_obj.rect, &line_obj.line)
-                {
-                    line_obj.line.end = intersection;
-                }
-            }
-        }
-
-        for (_id, text_obj) in self.texts.iter_mut() {
-            if let Some(p) = text_obj
-                .anchor_rect_id
-                .and_then(|id| self.rectangles.get(&id))
-                .map(|rect_obj| rect_obj.rect.midpoint())
-            {
-                text_obj.start = p;
-            }
-        }
+        self.on_update();
 
         true
     }
