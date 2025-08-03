@@ -1,4 +1,4 @@
-use terge::Line;
+use terge::line::Line;
 
 use crate::common::IdType;
 

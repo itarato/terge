@@ -1,4 +1,4 @@
-use terge::{EventGroup, Gfx, Terge};
+use terge::{Terge, event_group::EventGroup, gfx::Gfx};
 
 struct App {
     counter: u64,

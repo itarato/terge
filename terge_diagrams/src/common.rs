@@ -1,5 +1,9 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use terge::{I32Point, Line, Rect, intersection_of_rect_and_line};
+use terge::{
+    common::{I32Point, intersection_of_rect_and_line},
+    line::Line,
+    rect::Rect,
+};
 
 use crate::text_editor::TextEditor;
 

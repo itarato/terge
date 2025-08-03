@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use terge::UsizePoint;
+use terge::common::UsizePoint;
 
 pub struct TextEditor {
     cursor: UsizePoint,

@@ -1,4 +1,4 @@
-use terge::{Gfx, I32Point};
+use terge::{common::I32Point, gfx::Gfx};
 
 use crate::common::{COLORS, IdType};
 

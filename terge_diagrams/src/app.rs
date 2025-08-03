@@ -1,9 +1,13 @@
 use std::collections::HashMap;
 
 use crossterm::event::KeyEvent;
-use crossterm::event::{Event, KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use log::{debug, error};
-use terge::{Arithmetics, I32Point, Line, Rect};
+use crossterm::event::{Event, KeyCode, MouseButton, MouseEvent, MouseEventKind};
+use log::error;
+use terge::common::{Arithmetics, I32Point};
+use terge::event_group::EventGroup;
+use terge::gfx::Gfx;
+use terge::line::Line;
+use terge::rect::Rect;
 
 use crate::common::*;
 use crate::line::*;
@@ -398,7 +402,7 @@ impl App {
 }
 
 impl terge::App for App {
-    fn draw(&self, gfx: &mut terge::Gfx) {
+    fn draw(&self, gfx: &mut Gfx) {
         gfx.clear_screen();
 
         for (_id, rect_obj) in &self.rectangles {
@@ -476,9 +480,9 @@ impl terge::App for App {
         );
     }
 
-    fn reset(&mut self, _gfx: &mut terge::Gfx) {}
+    fn reset(&mut self, _gfx: &mut Gfx) {}
 
-    fn update(&mut self, events: &terge::EventGroup, _gfx: &mut terge::Gfx) -> bool {
+    fn update(&mut self, events: &EventGroup, _gfx: &mut Gfx) -> bool {
         if let Some(last_mouse_pos) = events.last_mouse_pos() {
             self.current_mouse_pos.0 = last_mouse_pos.0 as i32;
             self.current_mouse_pos.1 = last_mouse_pos.1 as i32;

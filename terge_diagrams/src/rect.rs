@@ -1,4 +1,7 @@
-use terge::{Arithmetics, I32Point, Rect, point_pair_minmax};
+use terge::{
+    common::{Arithmetics, I32Point, point_pair_minmax},
+    rect::Rect,
+};
 
 use crate::common::IdType;
 
