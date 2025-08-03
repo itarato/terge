@@ -13,6 +13,6 @@ fn main() {
     pretty_env_logger::init();
 
     let mut engine = Terge::new(Box::new(App::new()));
-    engine.set_target_fps(120);
+    engine.set_target_fps(60);
     engine.run();
 }
