@@ -1,0 +1,10 @@
+[package]
+name = "terge_diagrams"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+log = "0.4"
+pretty_env_logger = "0.4"
+terge = { path = "../terge_lib" }
+crossterm = "0.29"
