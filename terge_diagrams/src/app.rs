@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crossterm::event::KeyEvent;
 use crossterm::event::{Event, KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use log::error;
-use terge::common::{Arithmetics, I32Point, U16Point, i32point_to_u16point, u16point_to_i32point};
+use terge::common::{Arithmetics, U16Point, i32point_to_u16point, u16point_to_i32point};
 use terge::event_group::EventGroup;
 use terge::gfx::Gfx;
 use terge::line::Line;
@@ -182,20 +182,9 @@ impl App {
         None
     }
 
-    fn is_text_editable_at(&self, text_obj: &TextObject, p: U16Point) -> bool {
-        if let Some(rect_obj) = text_obj
-            .anchor_rect_id
-            .and_then(|id| self.rectangles.get(&id))
-        {
-            rect_obj.rect.is_point_inside(p)
-        } else {
-            text_obj.is_edit_point(p)
-        }
-    }
-
-    fn text_under_point(&self, p: U16Point) -> Option<&TextObject> {
+    fn text_edit_under_point(&self, p: U16Point) -> Option<&TextObject> {
         for (_id, text_obj) in &self.texts {
-            if self.is_text_editable_at(text_obj, p) {
+            if text_obj.is_edit_point(p) {
                 return Some(text_obj);
             }
         }
@@ -243,7 +232,7 @@ impl App {
             self.action = Some(Action::DragLineEnd {
                 line_id: line_obj.id,
             });
-        } else if let Some(text_obj) = self.text_under_point(self.current_mouse_pos) {
+        } else if let Some(text_obj) = self.text_edit_under_point(self.current_mouse_pos) {
             let id = text_obj.id;
 
             self.action = Some(Action::Text {
@@ -432,7 +421,7 @@ impl terge::App for App {
         for (_id, text_obj) in &self.texts {
             text_obj.draw(&gfx);
 
-            if self.is_text_editable_at(text_obj, self.current_mouse_pos) {
+            if text_obj.is_edit_point(self.current_mouse_pos) {
                 gfx.draw_text_at_point(EDIT_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
             }
         }

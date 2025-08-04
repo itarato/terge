@@ -10,6 +10,16 @@ pub const BOX_HORIZONTAL_CHAR: &'static str = "═";
 pub const LINE_CONNECTION_CHAR: &'static str = "X";
 pub const DEFAULT_COLOR_CODE: u8 = 0;
 
+pub enum TextHorizontalAlign {
+    Left,
+    Center,
+}
+
+pub enum TextVercticalAlign {
+    Top,
+    Center,
+}
+
 pub type I32Point = (i32, i32);
 pub type U16Point = (u16, u16);
 pub type UsizePoint = (usize, usize);
@@ -107,4 +117,36 @@ pub fn intersection_of_rect_and_line(rect: &Rect, line: &Line) -> Vec<U16Point> 
     }
 
     out
+}
+
+pub fn multiline_text_line_start(
+    line_count: u16,
+    line_length: u16,
+    line_index: u16,
+    start: U16Point,
+    horizontal_align: TextHorizontalAlign,
+    vertical_align: TextVercticalAlign,
+) -> U16Point {
+    let x = match horizontal_align {
+        TextHorizontalAlign::Left => start.0,
+        TextHorizontalAlign::Center => {
+            if start.0 < (line_length / 2) {
+                0
+            } else {
+                start.0 - (line_length / 2)
+            }
+        }
+    };
+    let y = match vertical_align {
+        TextVercticalAlign::Center => {
+            if (start.1 + line_index) < (line_count / 2) {
+                0
+            } else {
+                start.1 + line_index - (line_count / 2)
+            }
+        }
+        TextVercticalAlign::Top => start.1 + line_index,
+    };
+
+    (x, y)
 }

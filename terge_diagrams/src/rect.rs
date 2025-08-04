@@ -1,11 +1,10 @@
 use terge::{
-    common::{Arithmetics, U16Point, point_pair_minmax},
+    common::{U16Point, point_pair_minmax},
     rect::Rect,
 };
 
 use crate::common::IdType;
 
-// TODO: Add hover-over highlight
 pub struct RectObject {
     pub id: IdType,
     pub color: usize,
