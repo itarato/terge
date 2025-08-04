@@ -420,7 +420,9 @@ impl terge::App for App {
         for (_id, rect_obj) in &self.rectangles {
             gfx.draw_rect(&rect_obj.rect, COLORS[rect_obj.color].0);
 
-            if rect_obj.rect.end() == self.current_mouse_pos {
+            if rect_obj.is_drag_point(self.current_mouse_pos)
+                || rect_obj.is_resize_point(self.current_mouse_pos)
+            {
                 gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
             }
         }
@@ -428,10 +430,7 @@ impl terge::App for App {
         for (_id, line_obj) in &self.lines {
             gfx.draw_line(&line_obj.line, COLORS[line_obj.color].0);
 
-            if line_obj.line.start == self.current_mouse_pos {
-                gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
-            }
-            if line_obj.line.end == self.current_mouse_pos {
+            if line_obj.is_drag_point(self.current_mouse_pos) {
                 gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
             }
         }

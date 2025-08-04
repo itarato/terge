@@ -1,4 +1,4 @@
-use terge::line::Line;
+use terge::{common::U16Point, line::Line};
 
 use crate::common::IdType;
 
@@ -19,5 +19,9 @@ impl LineObject {
             end_anchor_rect_id: None,
             color,
         }
+    }
+
+    pub(crate) fn is_drag_point(&self, p: U16Point) -> bool {
+        p == self.line.start || p == self.line.end
     }
 }

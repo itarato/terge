@@ -22,4 +22,12 @@ impl RectObject {
         self.rect.start = (min_x, min_y);
         self.rect.size = (max_x - min_x, max_y - min_y);
     }
+
+    pub(crate) fn is_resize_point(&self, p: U16Point) -> bool {
+        self.rect.end() == p
+    }
+
+    pub(crate) fn is_drag_point(&self, p: U16Point) -> bool {
+        self.rect.is_point_on_header(p)
+    }
 }
