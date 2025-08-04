@@ -106,9 +106,9 @@ impl App {
                 self.update_line_end_anchor(line_id);
                 self.action = None;
             }
-            Some(Action::DragRectangle { .. }) | Some(Action::ResizeRectangle { .. }) => {
-                self.action = None
-            }
+            Some(Action::DragRectangle { .. })
+            | Some(Action::ResizeRectangle { .. })
+            | Some(Action::DragText { .. }) => self.action = None,
             Some(Action::Text { .. }) | None => {}
         }
     }
@@ -191,6 +191,15 @@ impl App {
         None
     }
 
+    fn text_drag_under_point(&self, p: U16Point) -> Option<&TextObject> {
+        for (_id, text_obj) in &self.texts {
+            if text_obj.is_drag_point(p) {
+                return Some(text_obj);
+            }
+        }
+        None
+    }
+
     fn line_with_start_under_point(&mut self, p: U16Point) -> Option<&mut LineObject> {
         for (_id, line_obj) in &mut self.lines {
             if line_obj.line.start == p {
@@ -241,6 +250,10 @@ impl App {
             });
 
             self.texts.remove(&id);
+        } else if let Some(text_obj) = self.text_drag_under_point(self.current_mouse_pos) {
+            self.action = Some(Action::DragText {
+                text_id: text_obj.id,
+            });
         } else if let Some(rect_obj) = self.rectangle_header_under_point(self.current_mouse_pos) {
             self.action = Some(Action::DragRectangle {
                 rectangle_id: rect_obj.id,
@@ -341,6 +354,11 @@ impl App {
                     .get_mut(&line_id)
                     .map(|line_obj| line_obj.line.end = self.current_mouse_pos);
             }
+            Some(Action::DragText { text_id }) => {
+                self.texts
+                    .get_mut(&text_id)
+                    .map(|text_obj| text_obj.start = self.current_mouse_pos);
+            }
             Some(Action::Rect { .. })
             | Some(Action::Text { .. })
             | Some(Action::Line { .. })
@@ -424,6 +442,9 @@ impl terge::App for App {
             if text_obj.is_edit_point(self.current_mouse_pos) {
                 gfx.draw_text_at_point(EDIT_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
             }
+            if text_obj.is_drag_point(self.current_mouse_pos) {
+                gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
+            }
         }
 
         if let Some(draw_action) = &self.action {
@@ -438,10 +459,6 @@ impl terge::App for App {
                     self.current_mouse_pos,
                     self.current_color_code(),
                 ),
-                Action::DragRectangle { .. } => {}
-                Action::DragLineStart { .. } => {}
-                Action::DragLineEnd { .. } => {}
-                Action::ResizeRectangle { .. } => {}
                 Action::Text { start, editor } => {
                     gfx.draw_multiline_text(
                         &editor.lines,
@@ -451,6 +468,11 @@ impl terge::App for App {
                     );
                     gfx.draw_text_to_current_pos("_");
                 }
+                Action::DragRectangle { .. }
+                | Action::DragLineStart { .. }
+                | Action::DragLineEnd { .. }
+                | Action::ResizeRectangle { .. }
+                | Action::DragText { .. } => {}
             };
         }
 

@@ -53,6 +53,9 @@ pub enum Action {
     DragLineEnd {
         line_id: IdType,
     },
+    DragText {
+        text_id: IdType,
+    },
     ResizeRectangle {
         rectangle_id: IdType,
         orig_start: U16Point,
@@ -76,6 +79,7 @@ impl Action {
             Action::ResizeRectangle { .. } => "resize rectangle",
             Action::DragLineStart { .. } => "drag line start",
             Action::DragLineEnd { .. } => "drag line end",
+            Action::DragText { .. } => "drag text",
         }
     }
 }
