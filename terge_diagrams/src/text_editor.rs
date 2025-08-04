@@ -16,7 +16,7 @@ impl TextEditor {
 
     pub fn new_with_lines(lines: Vec<String>) -> Self {
         Self {
-            cursor: (0, 0),
+            cursor: (0, lines.len() - 1),
             lines,
         }
     }

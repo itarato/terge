@@ -31,7 +31,24 @@ impl TextObject {
     }
 
     pub fn is_edit_point(&self, p: U16Point) -> bool {
-        self.start == p
+        let mut first_checked = false;
+
+        for (i, line) in self.lines.iter().enumerate() {
+            let pos = self.line_start(i);
+
+            if !first_checked {
+                first_checked = true;
+                if pos == p {
+                    return false;
+                }
+            }
+
+            if pos.1 == p.1 && p.0 >= pos.0 && p.0 <= pos.0 + line.len() as u16 {
+                return true;
+            }
+        }
+
+        false
     }
 
     pub fn draw(&self, gfx: &Gfx) {
