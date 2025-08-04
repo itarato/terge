@@ -106,9 +106,18 @@ impl App {
                 self.update_line_end_anchor(line_id);
                 self.action = None;
             }
-            Some(Action::DragRectangle { .. })
-            | Some(Action::ResizeRectangle { .. })
-            | Some(Action::DragText { .. }) => self.action = None,
+            Some(Action::DragText { text_id }) => {
+                let rect_id = self
+                    .rectangle_under_point(self.current_mouse_pos)
+                    .map(|rect_obj| rect_obj.id);
+                self.texts
+                    .get_mut(&text_id)
+                    .map(|text_obj| text_obj.anchor_rect_id = rect_id);
+                self.action = None;
+            }
+            Some(Action::DragRectangle { .. }) | Some(Action::ResizeRectangle { .. }) => {
+                self.action = None;
+            }
             Some(Action::Text { .. }) | None => {}
         }
     }
@@ -401,7 +410,14 @@ impl App {
                 .and_then(|id| self.rectangles.get(&id))
                 .map(|rect_obj| rect_obj.rect.midpoint())
             {
-                text_obj.start = p;
+                let is_text_dragged = match self.action {
+                    Some(Action::DragText { text_id }) => text_id == text_obj.id,
+                    _ => false,
+                };
+
+                if !is_text_dragged {
+                    text_obj.start = p;
+                }
             }
         }
     }
