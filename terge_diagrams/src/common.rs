@@ -11,6 +11,7 @@ pub(crate) type IdType = u64;
 
 pub(crate) const DRAG_STR: &'static str = "+";
 pub(crate) const EDIT_STR: &'static str = "#";
+pub(crate) const POINTER_STR: &'static str = "*";
 pub(crate) const COLORS: [(u8, &'static str); 10] = [
     (39, "Default color"),
     (31, "Red"),
@@ -30,6 +31,7 @@ pub enum Intent {
     Line,
     Rect,
     Text,
+    Pointer,
 }
 
 pub enum Action {
@@ -60,6 +62,7 @@ pub enum Action {
         rectangle_id: IdType,
         orig_start: U16Point,
     },
+    Pointer,
 }
 
 impl Action {
@@ -80,8 +83,14 @@ impl Action {
             Action::DragLineStart { .. } => "drag line start",
             Action::DragLineEnd { .. } => "drag line end",
             Action::DragText { .. } => "drag text",
+            Action::Pointer => "pointer",
         }
     }
+}
+
+pub struct PointerPoint {
+    pub pos: U16Point,
+    pub deadline: u128,
 }
 
 pub fn intersection_of_rect_and_anchored_line(rect: &Rect, line: &Line) -> Option<U16Point> {

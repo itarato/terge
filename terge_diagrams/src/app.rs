@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use crossterm::event::KeyEvent;
 use crossterm::event::{Event, KeyCode, MouseButton, MouseEvent, MouseEventKind};
@@ -24,6 +24,7 @@ pub struct App {
     rectangles: HashMap<IdType, RectObject>,
     lines: HashMap<IdType, LineObject>,
     texts: HashMap<IdType, TextObject>,
+    pointer_trace: VecDeque<PointerPoint>,
 }
 
 impl App {
@@ -37,6 +38,7 @@ impl App {
             rectangles: HashMap::new(),
             lines: HashMap::new(),
             texts: HashMap::new(),
+            pointer_trace: VecDeque::new(),
         }
     }
 
@@ -60,6 +62,7 @@ impl App {
                     editor: TextEditor::new(),
                 })
             }
+            Intent::Pointer => self.action = Some(Action::Pointer),
         }
     }
 
@@ -115,7 +118,9 @@ impl App {
                     .map(|text_obj| text_obj.anchor_rect_id = rect_id);
                 self.action = None;
             }
-            Some(Action::DragRectangle { .. }) | Some(Action::ResizeRectangle { .. }) => {
+            Some(Action::DragRectangle { .. })
+            | Some(Action::ResizeRectangle { .. })
+            | Some(Action::Pointer) => {
                 self.action = None;
             }
             Some(Action::Text { .. }) | None => {}
@@ -323,6 +328,7 @@ impl App {
                 'r' => self.intent = Intent::Rect,
                 'l' => self.intent = Intent::Line,
                 't' => self.intent = Intent::Text,
+                'p' => self.intent = Intent::Pointer,
                 num_c @ '0'..='9' => self.current_color = (num_c as u8 - b'0') as usize,
                 _ => {}
             },
@@ -368,6 +374,7 @@ impl App {
                     .get_mut(&text_id)
                     .map(|text_obj| text_obj.start = self.current_mouse_pos);
             }
+            Some(Action::Pointer) => self.populate_pointer_trace(),
             Some(Action::Rect { .. })
             | Some(Action::Text { .. })
             | Some(Action::Line { .. })
@@ -426,6 +433,43 @@ impl App {
         self.on_update_current_action();
         self.on_update_lines_state();
         self.on_update_text_state();
+        self.update_pointer_trace();
+    }
+
+    fn populate_pointer_trace(&mut self) {
+        let can_have_new = if let Some(last_coord) = self.pointer_trace.front().map(|pt| pt.pos) {
+            last_coord != self.current_mouse_pos
+        } else {
+            true
+        };
+
+        if can_have_new {
+            let current_time_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis();
+            self.pointer_trace.push_front(PointerPoint {
+                pos: self.current_mouse_pos,
+                deadline: current_time_ms + 2000,
+            });
+        }
+    }
+
+    fn update_pointer_trace(&mut self) {
+        let current_time_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+
+        loop {
+            if let Some(deadline) = self.pointer_trace.back().map(|pt| pt.deadline) {
+                if deadline < current_time_ms {
+                    self.pointer_trace.pop_back();
+                    continue;
+                }
+            }
+            break;
+        }
     }
 }
 
@@ -462,6 +506,15 @@ impl terge::App for App {
             }
         }
 
+        for trace in &self.pointer_trace {
+            gfx.draw_text(
+                POINTER_STR,
+                trace.pos.0,
+                trace.pos.1,
+                self.current_color_code(),
+            );
+        }
+
         if let Some(draw_action) = &self.action {
             match draw_action {
                 Action::Rect { start } => gfx.draw_rect_from_points(
@@ -487,7 +540,15 @@ impl terge::App for App {
                 | Action::DragLineStart { .. }
                 | Action::DragLineEnd { .. }
                 | Action::ResizeRectangle { .. }
-                | Action::DragText { .. } => {}
+                | Action::DragText { .. }
+                | Action::Pointer => {
+                    gfx.draw_text(
+                        POINTER_STR,
+                        self.current_mouse_pos.0,
+                        self.current_mouse_pos.1,
+                        self.current_color_code(),
+                    );
+                }
             };
         }
 
