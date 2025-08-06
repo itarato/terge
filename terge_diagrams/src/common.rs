@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use terge::{
     common::{I32Point, U16Point, intersection_of_rect_and_line},
@@ -113,4 +115,22 @@ impl KeyEventUtil for KeyEvent {
     fn is_enter_without_alt(&self) -> bool {
         self.code == KeyCode::Enter && !self.modifiers.contains(KeyModifiers::ALT)
     }
+}
+
+pub fn delete_one_from_list_with_cond<K, V, C>(list: &mut HashMap<K, V>, cond: C) -> bool
+where
+    C: Fn(&mut V) -> bool,
+{
+    let mut done = false;
+
+    list.retain(|_, o| {
+        if !done && cond(o) {
+            done = true;
+            false
+        } else {
+            true
+        }
+    });
+
+    done
 }

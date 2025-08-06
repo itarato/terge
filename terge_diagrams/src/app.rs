@@ -187,6 +187,7 @@ impl App {
         None
     }
 
+    /// Find the most likely (smallest) rectangle.
     fn rectangle_under_point(&self, p: U16Point) -> Option<&RectObject> {
         let mut out = None;
         let mut smallest_area = u16::MAX;
@@ -289,46 +290,15 @@ impl App {
     }
 
     fn delete_under_point(&mut self, p: U16Point) {
-        let mut done = false;
-
-        self.texts.retain(|_, text_obj| {
-            if !done && text_obj.is_point_on(p) {
-                done = true;
-                false
-            } else {
-                true
-            }
-        });
-
-        if done {
+        if delete_one_from_list_with_cond(&mut self.texts, |o| o.is_point_on(p)) {
+            return;
+        }
+        if delete_one_from_list_with_cond(&mut self.lines, |o| o.line.is_point_on(p)) {
             return;
         }
 
-        self.lines.retain(|_, line_obj| {
-            if !done && line_obj.line.is_point_on(p) {
-                done = true;
-                false
-            } else {
-                true
-            }
-        });
-
-        if done {
-            return;
-        }
-
-        self.rectangles.retain(|_, rect_obj| {
-            if !done && rect_obj.rect.is_point_on(p) {
-                done = true;
-                false
-            } else {
-                true
-            }
-        });
-        // TODO cleanup dangling rect ids from lines and texts.
-
-        if done {
-            return;
+        if let Some(id) = self.rectangle_under_point(p).map(|rect_obj| rect_obj.id) {
+            self.rectangles.remove(&id);
         }
     }
 
