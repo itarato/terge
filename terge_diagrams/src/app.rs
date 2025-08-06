@@ -291,15 +291,14 @@ impl App {
     fn delete_under_point(&mut self, p: U16Point) {
         let mut done = false;
 
-        self.rectangles.retain(|_, rect_obj| {
-            if !done && rect_obj.rect.is_point_on(p) {
+        self.texts.retain(|_, text_obj| {
+            if !done && text_obj.is_point_on(p) {
                 done = true;
                 false
             } else {
                 true
             }
         });
-        // TODO cleanup dangling rect ids from lines and texts.
 
         if done {
             return;
@@ -313,6 +312,20 @@ impl App {
                 true
             }
         });
+
+        if done {
+            return;
+        }
+
+        self.rectangles.retain(|_, rect_obj| {
+            if !done && rect_obj.rect.is_point_on(p) {
+                done = true;
+                false
+            } else {
+                true
+            }
+        });
+        // TODO cleanup dangling rect ids from lines and texts.
 
         if done {
             return;

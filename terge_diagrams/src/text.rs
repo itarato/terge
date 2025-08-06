@@ -55,6 +55,10 @@ impl TextObject {
         self.line_start(0) == p
     }
 
+    pub fn is_point_on(&self, p: U16Point) -> bool {
+        self.is_edit_point(p) || self.is_drag_point(p)
+    }
+
     pub fn draw(&self, gfx: &Gfx) {
         for (i, line) in self.lines.iter().enumerate() {
             let pos = self.line_start(i);
