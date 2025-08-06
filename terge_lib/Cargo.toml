@@ -12,7 +12,6 @@ name = "pong"
 path = "examples/pong.rs"
 
 [dependencies]
-term_size = "0.3"
 crossterm = "0.29"
 log = "0.4"
 
