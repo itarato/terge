@@ -1,4 +1,5 @@
 use std::collections::{HashMap, VecDeque};
+use std::u16;
 
 use crossterm::event::KeyEvent;
 use crossterm::event::{Event, KeyCode, MouseButton, MouseEvent, MouseEventKind};
@@ -187,13 +188,17 @@ impl App {
     }
 
     fn rectangle_under_point(&self, p: U16Point) -> Option<&RectObject> {
+        let mut out = None;
+        let mut smallest_area = u16::MAX;
+
         for (_id, rect_obj) in &self.rectangles {
-            if rect_obj.rect.is_point_on(p) {
-                return Some(rect_obj);
+            if rect_obj.rect.is_point_on(p) && rect_obj.rect.area() < smallest_area {
+                smallest_area = rect_obj.rect.area();
+                out = Some(rect_obj);
             }
         }
 
-        None
+        out
     }
 
     fn text_edit_under_point(&self, p: U16Point) -> Option<&TextObject> {

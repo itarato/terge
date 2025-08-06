@@ -41,4 +41,8 @@ impl Rect {
     pub fn end(&self) -> U16Point {
         self.start.add(self.size)
     }
+
+    pub fn area(&self) -> u16 {
+        self.size.0 * self.size.1
+    }
 }
