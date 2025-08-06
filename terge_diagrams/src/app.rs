@@ -459,6 +459,13 @@ impl App {
             break;
         }
     }
+
+    fn on_mouse_middle_down(&mut self) {
+        self.action = Some(Action::Text {
+            start: self.current_mouse_pos,
+            editor: TextEditor::new(),
+        });
+    }
 }
 
 impl terge::App for App {
@@ -575,6 +582,9 @@ impl terge::App for App {
                     }
                     if mouse_event.kind == MouseEventKind::Up(MouseButton::Left) {
                         self.on_mouse_left_up();
+                    }
+                    if mouse_event.kind == MouseEventKind::Down(MouseButton::Middle) {
+                        self.on_mouse_middle_down();
                     }
                 }
                 Event::Key(key_event) => {
