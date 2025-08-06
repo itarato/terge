@@ -26,6 +26,7 @@ pub struct App {
     lines: HashMap<IdType, LineObject>,
     texts: HashMap<IdType, TextObject>,
     pointer_trace: VecDeque<PointerPoint>,
+    click_trace: VecDeque<(U16Point, u128)>,
 }
 
 impl App {
@@ -40,6 +41,7 @@ impl App {
             lines: HashMap::new(),
             texts: HashMap::new(),
             pointer_trace: VecDeque::new(),
+            click_trace: VecDeque::new(),
         }
     }
 
@@ -63,7 +65,11 @@ impl App {
                     editor: TextEditor::new(),
                 })
             }
-            Intent::Pointer => self.action = Some(Action::Pointer),
+            Intent::Pointer => {
+                self.action = Some(Action::Pointer);
+                self.click_trace
+                    .push_front((self.current_mouse_pos, get_current_time_ms() + 2000));
+            }
         }
     }
 
@@ -432,10 +438,7 @@ impl App {
         };
 
         if can_have_new {
-            let current_time_ms = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis();
+            let current_time_ms = get_current_time_ms();
             self.pointer_trace.push_front(PointerPoint {
                 pos: self.current_mouse_pos,
                 deadline: current_time_ms + 2000,
@@ -444,15 +447,22 @@ impl App {
     }
 
     fn update_pointer_trace(&mut self) {
-        let current_time_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
+        let current_time_ms = get_current_time_ms();
 
         loop {
             if let Some(deadline) = self.pointer_trace.back().map(|pt| pt.deadline) {
                 if deadline < current_time_ms {
                     self.pointer_trace.pop_back();
+                    continue;
+                }
+            }
+            break;
+        }
+
+        loop {
+            if let Some((_, deadline)) = self.click_trace.back() {
+                if *deadline < current_time_ms {
+                    self.click_trace.pop_back();
                     continue;
                 }
             }
@@ -565,6 +575,19 @@ impl terge::App for App {
             2,
             gfx.height - 1,
         );
+
+        let current_time_ms = get_current_time_ms();
+        let start_mod = (current_time_ms / 60) % CLICK_TRACE_STRS.len() as u128;
+        for (click_pos, _) in &self.click_trace {
+            for (i, [xoffs, yoffs]) in CLICK_TRACE_MAP.iter().enumerate() {
+                gfx.draw_text(
+                    CLICK_TRACE_STRS[(start_mod as usize + i) % CLICK_TRACE_STRS.len()],
+                    (click_pos.0 as i32 + *xoffs as i32) as u16,
+                    (click_pos.1 as i32 + *yoffs as i32) as u16,
+                    self.current_color_code(),
+                );
+            }
+        }
     }
 
     fn reset(&mut self, _gfx: &mut Gfx) {}

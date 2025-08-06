@@ -134,3 +134,31 @@ where
 
     done
 }
+
+pub(crate) fn get_current_time_ms() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis()
+}
+
+pub const CLICK_TRACE_MAP: [[i8; 2]; 16] = [
+    [-2, -2],
+    [-1, -2],
+    [0, -2],
+    [1, -2],
+    [2, -2],
+    [2, -1],
+    [2, 0],
+    [2, 1],
+    [2, 2],
+    [1, 2],
+    [0, 2],
+    [-1, 2],
+    [-2, 2],
+    [-2, 1],
+    [-2, 0],
+    [-2, -1],
+];
+
+pub const CLICK_TRACE_STRS: [&'static str; 5] = [" ", "░", "▒", "▓", "▉"];
