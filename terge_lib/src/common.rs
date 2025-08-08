@@ -24,6 +24,14 @@ pub type I32Point = (i32, i32);
 pub type U16Point = (u16, u16);
 pub type UsizePoint = (usize, usize);
 
+pub fn between_u16_inclusive(lhs: u16, rhs: u16, v: u16) -> bool {
+    if lhs < rhs {
+        (lhs..=rhs).contains(&v)
+    } else {
+        (rhs..=lhs).contains(&v)
+    }
+}
+
 pub fn i32point_to_u16point(p: I32Point) -> U16Point {
     (p.0 as u16, p.1 as u16)
 }

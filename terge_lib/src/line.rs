@@ -3,34 +3,30 @@ use std::ops;
 use crate::common::*;
 
 pub struct LinePointsIterator {
-    x_max: u16,
-    y_max: u16,
     diff_x: f32,
     diff_y: f32,
-    start: U16Point,
     i: u16,
+    lhs: U16Point,
+    rhs: U16Point,
 }
 
 impl LinePointsIterator {
     pub fn new(lhs: U16Point, rhs: U16Point) -> Self {
-        let (x_min, y_min, x_max, y_max) = point_pair_minmax(lhs, rhs);
-
         let diff_x = (rhs.0 as i32 - lhs.0 as i32) as f32;
         let diff_y = (rhs.1 as i32 - lhs.1 as i32) as f32;
 
         let i = if diff_x.abs() >= diff_y.abs() {
-            x_min
+            lhs.0
         } else {
-            y_min
+            lhs.1
         };
 
         Self {
-            x_max,
-            y_max,
             diff_x,
             diff_y,
-            start: lhs,
             i,
+            lhs,
+            rhs,
         }
     }
 }
@@ -41,30 +37,39 @@ impl Iterator for LinePointsIterator {
     fn next(&mut self) -> Option<Self::Item> {
         if self.diff_x.abs() >= self.diff_y.abs() {
             if self.diff_x != 0.0 {
-                if self.i > self.x_max {
+                if !between_u16_inclusive(self.lhs.0, self.rhs.0, self.i) {
                     return None;
                 }
 
                 let x = self.i;
-                self.i += 1;
 
-                let y = ((self.diff_y / self.diff_x) * (x as f32 - self.start.0 as f32)
-                    + self.start.1 as f32)
+                if self.lhs.0 < self.rhs.0 {
+                    self.i += 1;
+                } else {
+                    self.i -= 1;
+                }
+
+                let y = ((self.diff_y / self.diff_x) * (x as f32 - self.lhs.0 as f32)
+                    + self.lhs.1 as f32)
                     .round() as u16;
 
                 return Some((x, y));
             }
         } else {
             if self.diff_y != 0.0 {
-                if self.i > self.y_max {
+                if !between_u16_inclusive(self.lhs.1, self.rhs.1, self.i) {
                     return None;
                 }
 
                 let y = self.i;
-                self.i += 1;
+                if self.lhs.1 < self.rhs.1 {
+                    self.i += 1;
+                } else {
+                    self.i -= 1;
+                }
 
-                let x = ((self.diff_x / self.diff_y) * (y as f32 - self.start.1 as f32)
-                    + self.start.0 as f32)
+                let x = ((self.diff_x / self.diff_y) * (y as f32 - self.lhs.1 as f32)
+                    + self.lhs.0 as f32)
                     .round() as u16;
                 return Some((x, y));
             }
