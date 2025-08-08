@@ -43,4 +43,26 @@ impl LineObject {
             self.line.is_point_on(p)
         }
     }
+
+    pub(crate) fn start_line_segment(&self) -> Line {
+        if let Some(segment) = self.segment {
+            Line {
+                start: self.line.start,
+                end: segment,
+            }
+        } else {
+            self.line
+        }
+    }
+
+    pub(crate) fn end_line_segment(&self) -> Line {
+        if let Some(segment) = self.segment {
+            Line {
+                start: segment,
+                end: self.line.end,
+            }
+        } else {
+            self.line
+        }
+    }
 }

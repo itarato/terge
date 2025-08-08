@@ -436,9 +436,10 @@ impl App {
                 .and_then(|rect_id| self.rectangles.get(&rect_id))
             {
                 line_obj.line.start = rect_obj.rect.midpoint();
-                if let Some(intersection) =
-                    intersection_of_rect_and_anchored_line(&rect_obj.rect, &line_obj.line)
-                {
+                if let Some(intersection) = intersection_of_rect_and_anchored_line(
+                    &rect_obj.rect,
+                    &line_obj.start_line_segment(),
+                ) {
                     line_obj.line.start = intersection;
                 }
             }
@@ -448,9 +449,10 @@ impl App {
                 .and_then(|rect_id| self.rectangles.get(&rect_id))
             {
                 line_obj.line.end = rect_obj.rect.midpoint();
-                if let Some(intersection) =
-                    intersection_of_rect_and_anchored_line(&rect_obj.rect, &line_obj.line)
-                {
+                if let Some(intersection) = intersection_of_rect_and_anchored_line(
+                    &rect_obj.rect,
+                    &line_obj.end_line_segment(),
+                ) {
                     line_obj.line.end = intersection;
                 }
             }

@@ -85,7 +85,7 @@ impl Iterator for LinePointsIterator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Line {
     pub start: U16Point,
     pub end: U16Point,
