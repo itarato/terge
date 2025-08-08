@@ -122,22 +122,22 @@ pub enum Action {
 }
 
 impl Action {
-    action_match!(Action::Pointer, is_pointer);
-    action_match!(Action::Line(_), is_line);
-    action_match!(Action::Rect(_), is_rect);
+    // action_match!(Action::Pointer, is_pointer);
+    // action_match!(Action::Line(_), is_line);
+    // action_match!(Action::Rect(_), is_rect);
     action_match!(Action::Text(_), is_text);
-    action_match!(Action::DragRectangle(_), is_drag_rectangle);
-    action_match!(Action::DragLineStart(_), is_drag_line_start);
-    action_match!(Action::DragLineEnd(_), is_drag_line_end);
-    action_match!(Action::DragText(_), is_drag_text);
-    action_match!(Action::ResizeRectangle(_), is_resize_rectangle);
-    action_match!(Action::Freehand(_), is_freehand);
+    // action_match!(Action::DragRectangle(_), is_drag_rectangle);
+    // action_match!(Action::DragLineStart(_), is_drag_line_start);
+    // action_match!(Action::DragLineEnd(_), is_drag_line_end);
+    // action_match!(Action::DragText(_), is_drag_text);
+    // action_match!(Action::ResizeRectangle(_), is_resize_rectangle);
+    // action_match!(Action::Freehand(_), is_freehand);
 
     action_unwrap!(Line, unwrap_as_line, LineAction);
 
     action_unwrap!(Rect, unwrap_as_rect, RectAction);
-    action_unwrap!(Text, unwrap_as_text, TextAction);
-    action_unwrap!(DragRectangle, unwrap_as_drag_rectangle, DragRectangleAction);
+    // action_unwrap!(Text, unwrap_as_text, TextAction);
+    // action_unwrap!(DragRectangle, unwrap_as_drag_rectangle, DragRectangleAction);
     action_unwrap!(
         DragLineStart,
         unwrap_as_drag_line_start,
@@ -145,11 +145,11 @@ impl Action {
     );
     action_unwrap!(DragLineEnd, unwrap_as_drag_line_end, DragLineEndAction);
     action_unwrap!(DragText, unwrap_as_drag_text, DragTextAction);
-    action_unwrap!(
-        ResizeRectangle,
-        unwrap_as_resize_rectangle,
-        ResizeRectangleAction
-    );
+    // action_unwrap!(
+    //     ResizeRectangle,
+    //     unwrap_as_resize_rectangle,
+    //     ResizeRectangleAction
+    // );
     action_unwrap!(Freehand, unwrap_as_freehand, FreehandAction);
 
     pub fn to_string_short(&self) -> &str {
