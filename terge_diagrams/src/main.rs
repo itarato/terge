@@ -4,6 +4,7 @@ use crate::app::App;
 
 mod app;
 mod common;
+mod freehand;
 mod line;
 mod rect;
 mod text;

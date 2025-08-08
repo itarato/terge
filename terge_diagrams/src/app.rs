@@ -3,14 +3,15 @@ use std::u16;
 
 use crossterm::event::KeyEvent;
 use crossterm::event::{Event, KeyCode, MouseButton, MouseEvent, MouseEventKind};
-use log::error;
+use log::{debug, error};
 use terge::common::{Arithmetics, U16Point, i32point_to_u16point, u16point_to_i32point};
 use terge::event_group::EventGroup;
 use terge::gfx::Gfx;
-use terge::line::Line;
+use terge::line::{Line, LinePointsIterator};
 use terge::rect::Rect;
 
 use crate::common::*;
+use crate::freehand::Freehand;
 use crate::line::*;
 use crate::rect::*;
 use crate::text::*;
@@ -27,6 +28,7 @@ pub struct App {
     texts: HashMap<IdType, TextObject>,
     pointer_trace: VecDeque<PointerPoint>,
     click_trace: VecDeque<(U16Point, u128)>,
+    freehands: Vec<Freehand>,
 }
 
 impl App {
@@ -42,6 +44,7 @@ impl App {
             texts: HashMap::new(),
             pointer_trace: VecDeque::new(),
             click_trace: VecDeque::new(),
+            freehands: vec![],
         }
     }
 
@@ -57,25 +60,31 @@ impl App {
         }
 
         match self.intent {
-            Intent::Line => self.action = Some(Action::Line { start }),
-            Intent::Rect => self.action = Some(Action::Rect { start }),
+            Intent::Line => self.action = Some(Action::Line(LineAction { start })),
+            Intent::Rect => self.action = Some(Action::Rect(RectAction { start })),
             Intent::Text => {
-                self.action = Some(Action::Text {
+                self.action = Some(Action::Text(TextAction {
                     start,
                     editor: TextEditor::new(),
-                })
+                }))
             }
             Intent::Pointer => {
                 self.action = Some(Action::Pointer);
                 self.click_trace
                     .push_front((self.current_mouse_pos, get_current_time_ms() + 2000));
             }
+            Intent::Freehand => {
+                self.action = Some(Action::Freehand(FreehandAction {
+                    points: vec![self.current_mouse_pos],
+                }))
+            }
         }
     }
 
     fn on_mouse_left_up(&mut self) {
         match self.action {
-            Some(Action::Line { start }) => {
+            Some(Action::Line(_)) => {
+                let line_action = self.action.take().unwrap().unwrap_as_line();
                 let new_id = self.get_id();
 
                 self.lines.insert(
@@ -83,7 +92,7 @@ impl App {
                     LineObject::new(
                         new_id,
                         Line {
-                            start,
+                            start: line_action.start,
                             end: self.current_mouse_pos,
                         },
                         self.current_color,
@@ -92,37 +101,41 @@ impl App {
 
                 self.update_line_start_anchor(new_id);
                 self.update_line_end_anchor(new_id);
-
-                self.action = None;
             }
-            Some(Action::Rect { start }) => {
+            Some(Action::Rect(_)) => {
+                let rect_action = self.action.take().unwrap().unwrap_as_rect();
                 let new_id = self.get_id();
                 self.rectangles.insert(
                     new_id,
                     RectObject::new(
                         new_id,
                         self.current_color,
-                        Rect::new_from_unordered_points(start, self.current_mouse_pos),
+                        Rect::new_from_unordered_points(rect_action.start, self.current_mouse_pos),
                     ),
                 );
-
-                self.action = None;
             }
-            Some(Action::DragLineStart { line_id }) => {
-                self.update_line_start_anchor(line_id);
-                self.action = None;
+            Some(Action::DragLineStart(_)) => {
+                let action = self.action.take().unwrap().unwrap_as_drag_line_start();
+                self.update_line_start_anchor(action.line_id);
             }
-            Some(Action::DragLineEnd { line_id }) => {
-                self.update_line_end_anchor(line_id);
-                self.action = None;
+            Some(Action::DragLineEnd(_)) => {
+                let action = self.action.take().unwrap().unwrap_as_drag_line_end();
+                self.update_line_end_anchor(action.line_id);
             }
-            Some(Action::DragText { text_id }) => {
+            Some(Action::DragText(_)) => {
+                let action = self.action.take().unwrap().unwrap_as_drag_text();
                 let rect_id = self
                     .rectangle_under_point(self.current_mouse_pos)
                     .map(|rect_obj| rect_obj.id);
                 self.texts
-                    .get_mut(&text_id)
+                    .get_mut(&action.text_id)
                     .map(|text_obj| text_obj.anchor_rect_id = rect_id);
+                self.action = None;
+            }
+            Some(Action::Freehand(_)) => {
+                let action = self.action.take().unwrap().unwrap_as_freehand();
+                self.freehands
+                    .push(Freehand::new(action.points, self.current_color));
                 self.action = None;
             }
             Some(Action::DragRectangle { .. })
@@ -135,15 +148,21 @@ impl App {
     }
 
     fn end_text_mode(&mut self) {
-        if let Some(Action::Text { start, editor }) = self.action.take() {
+        if let Some(Action::Text(text_action)) = self.action.take() {
             let anchor_rect_id = self
-                .rectangle_under_point(start)
+                .rectangle_under_point(text_action.start)
                 .map(|rect_obj| rect_obj.id);
 
             let id = self.get_id();
             self.texts.insert(
                 id,
-                TextObject::new(id, start, editor.lines, anchor_rect_id, self.current_color),
+                TextObject::new(
+                    id,
+                    text_action.start,
+                    text_action.editor.lines,
+                    anchor_rect_id,
+                    self.current_color,
+                ),
             );
             self.action = None;
         } else {
@@ -253,39 +272,39 @@ impl App {
 
     fn on_left_mouse_button_down(&mut self, mouse_event: &MouseEvent) {
         if let Some(rect_obj) = self.rectangle_resize_point_under_point(self.current_mouse_pos) {
-            self.action = Some(Action::ResizeRectangle {
+            self.action = Some(Action::ResizeRectangle(ResizeRectangleAction {
                 rectangle_id: rect_obj.id,
                 orig_start: rect_obj.rect.start,
-            });
+            }));
         } else if let Some(line_obj) = self.line_with_start_under_point(self.current_mouse_pos) {
             line_obj.start_anchor_rect_id = None;
-            self.action = Some(Action::DragLineStart {
+            self.action = Some(Action::DragLineStart(DragLineStartAction {
                 line_id: line_obj.id,
-            });
+            }));
         } else if let Some(line_obj) = self.line_with_end_under_point(self.current_mouse_pos) {
             line_obj.end_anchor_rect_id = None;
-            self.action = Some(Action::DragLineEnd {
+            self.action = Some(Action::DragLineEnd(DragLineEndAction {
                 line_id: line_obj.id,
-            });
+            }));
         } else if let Some(text_obj) = self.text_edit_under_point(self.current_mouse_pos) {
             let id = text_obj.id;
 
-            self.action = Some(Action::Text {
+            self.action = Some(Action::Text(TextAction {
                 start: text_obj.start,
                 editor: TextEditor::new_with_lines(text_obj.lines.clone()),
-            });
+            }));
 
             self.texts.remove(&id);
         } else if let Some(text_obj) = self.text_drag_under_point(self.current_mouse_pos) {
-            self.action = Some(Action::DragText {
+            self.action = Some(Action::DragText(DragTextAction {
                 text_id: text_obj.id,
-            });
+            }));
         } else if let Some(rect_obj) = self.rectangle_header_under_point(self.current_mouse_pos) {
-            self.action = Some(Action::DragRectangle {
+            self.action = Some(Action::DragRectangle(DragRectangleAction {
                 rectangle_id: rect_obj.id,
                 offset: u16point_to_i32point(self.current_mouse_pos)
                     .sub(u16point_to_i32point(rect_obj.rect.start)),
-            });
+            }));
         } else {
             self.start_action((mouse_event.column, mouse_event.row));
         }
@@ -309,8 +328,8 @@ impl App {
     }
 
     fn text_edit_mode_update(&mut self, key_event: &KeyEvent) {
-        if let Some(Action::Text { editor, .. }) = self.action.as_mut() {
-            editor.edit(&key_event);
+        if let Some(Action::Text(text_action)) = self.action.as_mut() {
+            text_action.editor.edit(&key_event);
         } else {
             unreachable!("Must be text action");
         }
@@ -323,6 +342,7 @@ impl App {
                 'l' => self.intent = Intent::Line,
                 't' => self.intent = Intent::Text,
                 'p' => self.intent = Intent::Pointer,
+                'f' => self.intent = Intent::Freehand,
                 num_c @ '0'..='9' => self.current_color = (num_c as u8 - b'0') as usize,
                 _ => {}
             },
@@ -332,43 +352,57 @@ impl App {
     }
 
     fn on_update_current_action(&mut self) {
-        match &self.action {
-            Some(Action::DragRectangle {
-                rectangle_id,
-                offset,
-            }) => {
-                self.rectangles.get_mut(&rectangle_id).map(|rect_obj| {
-                    let mut new_pos = u16point_to_i32point(self.current_mouse_pos).sub(*offset);
-                    if new_pos.0 < 0 {
-                        new_pos.0 = 0;
-                    }
-                    rect_obj.rect.start = i32point_to_u16point(new_pos)
-                });
-            }
-            Some(Action::ResizeRectangle {
-                rectangle_id,
-                orig_start,
-            }) => {
+        match &mut self.action {
+            Some(Action::DragRectangle(drag_rect_action)) => {
                 self.rectangles
-                    .get_mut(&rectangle_id)
-                    .map(|rect_obj| rect_obj.resize(*orig_start, self.current_mouse_pos));
+                    .get_mut(&drag_rect_action.rectangle_id)
+                    .map(|rect_obj| {
+                        let mut new_pos = u16point_to_i32point(self.current_mouse_pos)
+                            .sub(drag_rect_action.offset);
+                        if new_pos.0 < 0 {
+                            new_pos.0 = 0;
+                        }
+                        rect_obj.rect.start = i32point_to_u16point(new_pos)
+                    });
             }
-            Some(Action::DragLineStart { line_id }) => {
+            Some(Action::ResizeRectangle(resize_rect_action)) => {
+                self.rectangles
+                    .get_mut(&resize_rect_action.rectangle_id)
+                    .map(|rect_obj| {
+                        rect_obj.resize(resize_rect_action.orig_start, self.current_mouse_pos)
+                    });
+            }
+            Some(Action::DragLineStart(drag_line_action)) => {
                 self.lines
-                    .get_mut(&line_id)
+                    .get_mut(&drag_line_action.line_id)
                     .map(|line_obj| line_obj.line.start = self.current_mouse_pos);
             }
-            Some(Action::DragLineEnd { line_id }) => {
+            Some(Action::DragLineEnd(drag_line_action)) => {
                 self.lines
-                    .get_mut(&line_id)
+                    .get_mut(&drag_line_action.line_id)
                     .map(|line_obj| line_obj.line.end = self.current_mouse_pos);
             }
-            Some(Action::DragText { text_id }) => {
+            Some(Action::DragText(drag_text_action)) => {
                 self.texts
-                    .get_mut(&text_id)
+                    .get_mut(&drag_text_action.text_id)
                     .map(|text_obj| text_obj.start = self.current_mouse_pos);
             }
             Some(Action::Pointer) => self.populate_pointer_trace(),
+            Some(Action::Freehand(action)) => {
+                let last_point = action.points.last().unwrap();
+                let current_point = self.current_mouse_pos;
+
+                debug!("Last: {:?} Current: {:?}", last_point, current_point);
+
+                if last_point != &current_point {
+                    let mut line_iterator = LinePointsIterator::new(*last_point, current_point);
+                    line_iterator.next(); // Last point already exist.
+
+                    for p in line_iterator {
+                        action.points.push(p);
+                    }
+                }
+            }
             Some(Action::Rect { .. })
             | Some(Action::Text { .. })
             | Some(Action::Line { .. })
@@ -412,7 +446,7 @@ impl App {
                 .map(|rect_obj| rect_obj.rect.midpoint())
             {
                 let is_text_dragged = match self.action {
-                    Some(Action::DragText { text_id }) => text_id == text_obj.id,
+                    Some(Action::DragText(DragTextAction { text_id })) => text_id == text_obj.id,
                     _ => false,
                 };
 
@@ -471,10 +505,10 @@ impl App {
     }
 
     fn on_mouse_middle_down(&mut self) {
-        self.action = Some(Action::Text {
+        self.action = Some(Action::Text(TextAction {
             start: self.current_mouse_pos,
             editor: TextEditor::new(),
-        });
+        }));
     }
 }
 
@@ -511,6 +545,12 @@ impl terge::App for App {
             }
         }
 
+        for freehand in &self.freehands {
+            for p in &freehand.points {
+                gfx.draw_text(POINTER_STR, p.0, p.1, COLORS[freehand.color].0);
+            }
+        }
+
         for trace in &self.pointer_trace {
             gfx.draw_text(
                 POINTER_STR,
@@ -522,24 +562,29 @@ impl terge::App for App {
 
         if let Some(draw_action) = &self.action {
             match draw_action {
-                Action::Rect { start } => gfx.draw_rect_from_points(
-                    *start,
+                Action::Rect(rect_action) => gfx.draw_rect_from_points(
+                    rect_action.start,
                     self.current_mouse_pos,
                     self.current_color_code(),
                 ),
-                Action::Line { start } => gfx.draw_line_from_points(
-                    *start,
+                Action::Line(line_action) => gfx.draw_line_from_points(
+                    line_action.start,
                     self.current_mouse_pos,
                     self.current_color_code(),
                 ),
-                Action::Text { start, editor } => {
+                Action::Text(text_action) => {
                     gfx.draw_multiline_text(
-                        &editor.lines,
-                        start.0,
-                        start.1,
+                        &text_action.editor.lines,
+                        text_action.start.0,
+                        text_action.start.1,
                         self.current_color_code(),
                     );
                     gfx.draw_text_to_current_pos("_");
+                }
+                Action::Freehand(action) => {
+                    for p in &action.points {
+                        gfx.draw_text(POINTER_STR, p.0, p.1, self.current_color_code());
+                    }
                 }
                 Action::DragRectangle { .. }
                 | Action::DragLineStart { .. }

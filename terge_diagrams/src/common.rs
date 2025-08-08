@@ -9,6 +9,46 @@ use terge::{
 
 use crate::text_editor::TextEditor;
 
+macro_rules! action_match {
+    ($p:pat, $name:ident) => {
+        pub fn $name(&self) -> bool {
+            match self {
+                $p => true,
+                _ => false,
+            }
+        }
+    };
+}
+
+macro_rules! action_unwrap {
+    ($p:ident, $name:ident, $ret:ty) => {
+        pub fn $name(self) -> $ret {
+            match self {
+                Self::$p(inner) => inner,
+                _ => panic!("Failed force unwrap"),
+            }
+        }
+    };
+}
+
+/*
+
+enum MyEnum {
+    V1(T1),
+    V1(T2),
+}
+
+impl MyEnum {
+fn unwrap_as_v1(&self) -> &T {
+    match &self {
+        V1(inner) => inner,
+        _ => panic!(),
+    }
+}
+}
+
+*/
+
 pub(crate) type IdType = u64;
 
 pub(crate) const DRAG_STR: &'static str = "+";
@@ -34,46 +74,83 @@ pub enum Intent {
     Rect,
     Text,
     Pointer,
+    Freehand,
+}
+
+pub struct LineAction {
+    pub(crate) start: U16Point,
+}
+pub struct RectAction {
+    pub(crate) start: U16Point,
+}
+pub struct TextAction {
+    pub(crate) start: U16Point,
+    pub(crate) editor: TextEditor,
+}
+pub struct DragRectangleAction {
+    pub(crate) rectangle_id: IdType,
+    pub(crate) offset: I32Point,
+}
+pub struct DragLineStartAction {
+    pub(crate) line_id: IdType,
+}
+pub struct DragLineEndAction {
+    pub(crate) line_id: IdType,
+}
+pub struct DragTextAction {
+    pub(crate) text_id: IdType,
+}
+pub struct ResizeRectangleAction {
+    pub(crate) rectangle_id: IdType,
+    pub(crate) orig_start: U16Point,
+}
+pub struct FreehandAction {
+    pub(crate) points: Vec<U16Point>,
 }
 
 pub enum Action {
-    Line {
-        start: U16Point,
-    },
-    Rect {
-        start: U16Point,
-    },
-    Text {
-        start: U16Point,
-        editor: TextEditor,
-    },
-    DragRectangle {
-        rectangle_id: IdType,
-        offset: I32Point,
-    },
-    DragLineStart {
-        line_id: IdType,
-    },
-    DragLineEnd {
-        line_id: IdType,
-    },
-    DragText {
-        text_id: IdType,
-    },
-    ResizeRectangle {
-        rectangle_id: IdType,
-        orig_start: U16Point,
-    },
+    Line(LineAction),
+    Rect(RectAction),
+    Text(TextAction),
+    DragRectangle(DragRectangleAction),
+    DragLineStart(DragLineStartAction),
+    DragLineEnd(DragLineEndAction),
+    DragText(DragTextAction),
+    ResizeRectangle(ResizeRectangleAction),
     Pointer,
+    Freehand(FreehandAction),
 }
 
 impl Action {
-    pub fn is_text(&self) -> bool {
-        match self {
-            Action::Text { .. } => true,
-            _ => false,
-        }
-    }
+    action_match!(Action::Pointer, is_pointer);
+    action_match!(Action::Line(_), is_line);
+    action_match!(Action::Rect(_), is_rect);
+    action_match!(Action::Text(_), is_text);
+    action_match!(Action::DragRectangle(_), is_drag_rectangle);
+    action_match!(Action::DragLineStart(_), is_drag_line_start);
+    action_match!(Action::DragLineEnd(_), is_drag_line_end);
+    action_match!(Action::DragText(_), is_drag_text);
+    action_match!(Action::ResizeRectangle(_), is_resize_rectangle);
+    action_match!(Action::Freehand(_), is_freehand);
+
+    action_unwrap!(Line, unwrap_as_line, LineAction);
+
+    action_unwrap!(Rect, unwrap_as_rect, RectAction);
+    action_unwrap!(Text, unwrap_as_text, TextAction);
+    action_unwrap!(DragRectangle, unwrap_as_drag_rectangle, DragRectangleAction);
+    action_unwrap!(
+        DragLineStart,
+        unwrap_as_drag_line_start,
+        DragLineStartAction
+    );
+    action_unwrap!(DragLineEnd, unwrap_as_drag_line_end, DragLineEndAction);
+    action_unwrap!(DragText, unwrap_as_drag_text, DragTextAction);
+    action_unwrap!(
+        ResizeRectangle,
+        unwrap_as_resize_rectangle,
+        ResizeRectangleAction
+    );
+    action_unwrap!(Freehand, unwrap_as_freehand, FreehandAction);
 
     pub fn to_string_short(&self) -> &str {
         match self {
@@ -86,6 +163,7 @@ impl Action {
             Action::DragLineEnd { .. } => "drag line end",
             Action::DragText { .. } => "drag text",
             Action::Pointer => "pointer",
+            Action::Freehand { .. } => "freehand",
         }
     }
 }

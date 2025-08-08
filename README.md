@@ -1,2 +1,6 @@
 Bugs:
-- shapes out of screen cause overflow panic
+-
+
+Feature request:
+- line segments
+- free drawing
