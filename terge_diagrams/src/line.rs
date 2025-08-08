@@ -8,6 +8,7 @@ pub struct LineObject {
     pub start_anchor_rect_id: Option<IdType>,
     pub end_anchor_rect_id: Option<IdType>,
     pub color: usize,
+    pub segment: Option<U16Point>,
 }
 
 impl LineObject {
@@ -18,10 +19,28 @@ impl LineObject {
             start_anchor_rect_id: None,
             end_anchor_rect_id: None,
             color,
+            segment: None,
         }
     }
 
     pub(crate) fn is_drag_point(&self, p: U16Point) -> bool {
         p == self.line.start || p == self.line.end
+    }
+
+    pub(crate) fn is_point_on(&self, p: U16Point) -> bool {
+        if let Some(segment) = self.segment {
+            Line {
+                start: self.line.start,
+                end: segment,
+            }
+            .is_point_on(p)
+                || Line {
+                    start: segment,
+                    end: self.line.end,
+                }
+                .is_point_on(p)
+        } else {
+            self.line.is_point_on(p)
+        }
     }
 }

@@ -46,6 +46,9 @@ impl Iterator for LinePointsIterator {
                 if self.lhs.0 < self.rhs.0 {
                     self.i += 1;
                 } else {
+                    if self.i == 0 {
+                        return None;
+                    }
                     self.i -= 1;
                 }
 
@@ -65,6 +68,9 @@ impl Iterator for LinePointsIterator {
                 if self.lhs.1 < self.rhs.1 {
                     self.i += 1;
                 } else {
+                    if self.i == 0 {
+                        return None;
+                    }
                     self.i -= 1;
                 }
 

@@ -89,6 +89,9 @@ pub struct ResizeRectangleAction {
 pub struct FreehandAction {
     pub(crate) points: Vec<U16Point>,
 }
+pub struct LineSegmentAction {
+    pub(crate) line_id: IdType,
+}
 
 pub enum Action {
     Line(LineAction),
@@ -101,6 +104,7 @@ pub enum Action {
     ResizeRectangle(ResizeRectangleAction),
     Pointer,
     Freehand(FreehandAction),
+    LineSegment(LineSegmentAction),
 }
 
 impl Action {
@@ -119,16 +123,17 @@ impl Action {
 
     pub fn to_string_short(&self) -> &str {
         match self {
-            Action::Line { .. } => "line",
-            Action::Rect { .. } => "rect",
-            Action::Text { .. } => "text",
-            Action::DragRectangle { .. } => "drag rectangle",
-            Action::ResizeRectangle { .. } => "resize rectangle",
-            Action::DragLineStart { .. } => "drag line start",
-            Action::DragLineEnd { .. } => "drag line end",
-            Action::DragText { .. } => "drag text",
+            Action::Line(_) => "line",
+            Action::Rect(_) => "rect",
+            Action::Text(_) => "text",
+            Action::DragRectangle(_) => "drag rectangle",
+            Action::ResizeRectangle(_) => "resize rectangle",
+            Action::DragLineStart(_) => "drag line start",
+            Action::DragLineEnd(_) => "drag line end",
+            Action::DragText(_) => "drag text",
             Action::Pointer => "pointer",
-            Action::Freehand { .. } => "freehand",
+            Action::Freehand(_) => "freehand",
+            Action::LineSegment(_) => "segment",
         }
     }
 }

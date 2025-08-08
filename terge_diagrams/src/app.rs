@@ -140,7 +140,8 @@ impl App {
             }
             Some(Action::DragRectangle { .. })
             | Some(Action::ResizeRectangle { .. })
-            | Some(Action::Pointer) => {
+            | Some(Action::Pointer)
+            | Some(Action::LineSegment(_)) => {
                 self.action = None;
             }
             Some(Action::Text { .. }) | None => {}
@@ -263,6 +264,15 @@ impl App {
         None
     }
 
+    fn line_under_point(&mut self, p: U16Point) -> Option<&mut LineObject> {
+        for (_id, line_obj) in &mut self.lines {
+            if line_obj.is_point_on(p) {
+                return Some(line_obj);
+            }
+        }
+        None
+    }
+
     fn is_active_action_text(&self) -> bool {
         self.action
             .as_ref()
@@ -284,6 +294,10 @@ impl App {
         } else if let Some(line_obj) = self.line_with_end_under_point(self.current_mouse_pos) {
             line_obj.end_anchor_rect_id = None;
             self.action = Some(Action::DragLineEnd(DragLineEndAction {
+                line_id: line_obj.id,
+            }));
+        } else if let Some(line_obj) = self.line_under_point(self.current_mouse_pos) {
+            self.action = Some(Action::LineSegment(LineSegmentAction {
                 line_id: line_obj.id,
             }));
         } else if let Some(text_obj) = self.text_edit_under_point(self.current_mouse_pos) {
@@ -318,7 +332,7 @@ impl App {
         if delete_one_from_list_with_cond(&mut self.texts, |o| o.is_point_on(p)) {
             return;
         }
-        if delete_one_from_list_with_cond(&mut self.lines, |o| o.line.is_point_on(p)) {
+        if delete_one_from_list_with_cond(&mut self.lines, |o| o.is_point_on(p)) {
             return;
         }
 
@@ -402,6 +416,11 @@ impl App {
                         action.points.push(p);
                     }
                 }
+            }
+            Some(Action::LineSegment(action)) => {
+                self.lines
+                    .get_mut(&action.line_id)
+                    .map(|line_obj| line_obj.segment = Some(self.current_mouse_pos));
             }
             Some(Action::Rect { .. })
             | Some(Action::Text { .. })
@@ -527,7 +546,12 @@ impl terge::App for App {
         }
 
         for (_id, line_obj) in &self.lines {
-            gfx.draw_line(&line_obj.line, COLORS[line_obj.color].0);
+            if let Some(segment) = &line_obj.segment {
+                gfx.draw_line_from_points(line_obj.line.start, *segment, COLORS[line_obj.color].0);
+                gfx.draw_line_from_points(*segment, line_obj.line.end, COLORS[line_obj.color].0);
+            } else {
+                gfx.draw_line(&line_obj.line, COLORS[line_obj.color].0);
+            }
 
             if line_obj.is_drag_point(self.current_mouse_pos) {
                 gfx.draw_text_at_point(DRAG_STR, self.current_mouse_pos, DEFAULT_COLOR_CODE);
@@ -591,6 +615,7 @@ impl terge::App for App {
                 | Action::DragLineEnd { .. }
                 | Action::ResizeRectangle { .. }
                 | Action::DragText { .. }
+                | Action::LineSegment(_)
                 | Action::Pointer => {
                     gfx.draw_text(
                         POINTER_STR,
