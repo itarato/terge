@@ -23,6 +23,7 @@ pub enum TextVercticalAlign {
 pub type I32Point = (i32, i32);
 pub type U16Point = (u16, u16);
 pub type UsizePoint = (usize, usize);
+pub type F32Point = (f32, f32);
 
 pub fn between_u16_inclusive(lhs: u16, rhs: u16, v: u16) -> bool {
     if lhs < rhs {
