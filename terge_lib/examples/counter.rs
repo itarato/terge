@@ -28,10 +28,11 @@ impl App {
 impl terge::App for App {
     fn draw(&self, gfx: &mut Gfx) {
         gfx.clear_screen();
-        gfx.draw_text_uncoloured(
+        gfx.draw_text(
             format!("FPS: {}", self.fps).as_str(),
             gfx.width / 2 - 4,
             gfx.height / 2,
+            94,
         );
     }
 
