@@ -21,7 +21,7 @@ pub(crate) const PLAYER_SPRITE: [[&'static str; 3]; 2] =
     [[" Q", " l-", "/.\\."], [" Q", "/v", " |."]];
 pub(crate) const PLAYER_SPRITE_SPEED: u64 = 20;
 
-pub(crate) const TERRAIN_OBSTACLE_SPEED: u64 = 10;
+pub(crate) const TERRAIN_OBSTACLE_SPEED: u64 = 2;
 pub(crate) const TERRAIN_OBSTACLE_COLOR: u8 = 93;
 
 #[derive(Debug, Default)]
@@ -90,8 +90,10 @@ impl Terrain {
         }
 
         // Move obstacles.
-        for obstacle in self.obstacles.iter_mut() {
-            obstacle.0 -= 1;
+        if self.frame_counter == 0 {
+            for obstacle in self.obstacles.iter_mut() {
+                obstacle.0 -= 1;
+            }
         }
 
         // New obstacles.
