@@ -10,10 +10,12 @@ use terge::{
 
 pub(crate) const PLAYER_COLOR: u8 = 95;
 pub(crate) const PLAYER_VY_SLOWDOWN: f32 = 0.9;
-pub(crate) const PLAYER_VY_ACC: f32 = 1.2;
+pub(crate) const PLAYER_VY_ACC: f32 = 1.15;
 pub(crate) const PLAYER_VY_MAX: f32 = 2.0;
-pub(crate) const PLAYER_VY_FALLBACK_THRESHOLD: f32 = 0.05;
-pub(crate) const PLAYER_JUMP_MEDIUM: f32 = -2.0;
+pub(crate) const PLAYER_VY_FALLBACK_THRESHOLD: f32 = 0.2;
+
+//                                              Medium       Tall         Long         Short
+pub(crate) const JUMP_SETTING: [F32Point; 4] = [(-2.0, 2.0), (-3.0, 2.0), (-1.0, 4.0), (-1.0, 0.5)];
 
 pub(crate) const FLOOR_OFFS_FROM_BOTTOM: u16 = 6;
 
@@ -21,7 +23,7 @@ pub(crate) const PLAYER_SPRITE: [[&'static str; 3]; 2] =
     [[" Q", " l-", "/.\\."], [" Q", "/v", " |."]];
 pub(crate) const PLAYER_SPRITE_SPEED: u64 = 20;
 
-pub(crate) const TERRAIN_OBSTACLE_SPEED: u64 = 2;
+pub(crate) const TERRAIN_OBSTACLE_DEFAULT_SPEED: f32 = 1.0;
 pub(crate) const TERRAIN_OBSTACLE_COLOR: u8 = 93;
 
 #[derive(Debug, Default)]
@@ -52,7 +54,22 @@ impl terge::App for App {
         for event in &events.events {
             match &event {
                 Event::Key(key_event) => match &key_event.code {
-                    KeyCode::Char('w') => self.player.jump(PLAYER_JUMP_MEDIUM),
+                    KeyCode::Char('w') => {
+                        self.player.jump(JUMP_SETTING[1].0);
+                        self.terrain.set_speed(JUMP_SETTING[1].1);
+                    }
+                    KeyCode::Char('s') => {
+                        self.player.jump(JUMP_SETTING[0].0);
+                        self.terrain.set_speed(JUMP_SETTING[0].1);
+                    }
+                    KeyCode::Char('a') => {
+                        self.player.jump(JUMP_SETTING[3].0);
+                        self.terrain.set_speed(JUMP_SETTING[3].1);
+                    }
+                    KeyCode::Char('d') => {
+                        self.player.jump(JUMP_SETTING[2].0);
+                        self.terrain.set_speed(JUMP_SETTING[2].1);
+                    }
                     _ => {}
                 },
                 _ => {}
@@ -68,18 +85,16 @@ impl terge::App for App {
 
 #[derive(Debug, Default)]
 pub(crate) struct Terrain {
-    obstacles: VecDeque<U16Point>,
-    frame_counter: u64,
+    obstacles: VecDeque<F32Point>,
+    speed: f32,
 }
 
 impl Terrain {
     pub(crate) fn update(&mut self, gfx: &mut Gfx) {
-        self.frame_counter = (self.frame_counter + 1) % TERRAIN_OBSTACLE_SPEED;
-
         // Cleanup obstacles.
         loop {
             if let Some(obstacle) = self.obstacles.front() {
-                if obstacle.0 == 0 {
+                if obstacle.0 <= 0.0 {
                     self.obstacles
                         .pop_front()
                         .expect("Failed removing front obstacle");
@@ -90,17 +105,28 @@ impl Terrain {
         }
 
         // Move obstacles.
-        if self.frame_counter == 0 {
-            for obstacle in self.obstacles.iter_mut() {
-                obstacle.0 -= 1;
-            }
+        for obstacle in self.obstacles.iter_mut() {
+            obstacle.0 -= self.speed;
         }
 
         // New obstacles.
         let rand_u8: u8 = rand::random();
         if rand_u8 >= 250 {
             let rand_h: u8 = rand::random::<u8>() % 10 + 2;
-            self.obstacles.push_back((gfx.width - 1, rand_h as u16));
+            self.obstacles
+                .push_back(((gfx.width - 1) as f32, rand_h as f32));
+        }
+
+        // Regulate speed.
+        let diff = self.speed - TERRAIN_OBSTACLE_DEFAULT_SPEED;
+        if diff != 0.0 {
+            static SPEED_ADJUST: f32 = 0.95;
+            let new_diff = diff * SPEED_ADJUST;
+            self.speed = TERRAIN_OBSTACLE_DEFAULT_SPEED + new_diff;
+
+            if (self.speed - TERRAIN_OBSTACLE_DEFAULT_SPEED).abs() < 0.1 {
+                self.speed = TERRAIN_OBSTACLE_DEFAULT_SPEED;
+            }
         }
     }
 
@@ -108,10 +134,14 @@ impl Terrain {
         let floor = gfx.height - FLOOR_OFFS_FROM_BOTTOM;
 
         for obstacle in &self.obstacles {
-            for i in 0..obstacle.1 {
-                gfx.draw_text("#", obstacle.0, floor - i, TERRAIN_OBSTACLE_COLOR);
+            for i in 0..obstacle.1 as u16 {
+                gfx.draw_text("#", obstacle.0 as u16, floor - i, TERRAIN_OBSTACLE_COLOR);
             }
         }
+    }
+
+    pub(crate) fn set_speed(&mut self, speed: f32) {
+        self.speed = speed;
     }
 }
 
