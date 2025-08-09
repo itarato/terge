@@ -1,5 +1,12 @@
+use rand::prelude::*;
+use std::collections::VecDeque;
+
 use crossterm::event::{Event, KeyCode};
-use terge::{Terge, common::F32Point, gfx::Gfx};
+use terge::{
+    Terge,
+    common::{F32Point, U16Point},
+    gfx::Gfx,
+};
 
 pub(crate) const PLAYER_COLOR: u8 = 95;
 pub(crate) const PLAYER_VY_SLOWDOWN: f32 = 0.9;
@@ -14,9 +21,13 @@ pub(crate) const PLAYER_SPRITE: [[&'static str; 3]; 2] =
     [[" Q", " l-", "/.\\."], [" Q", "/v", " |."]];
 pub(crate) const PLAYER_SPRITE_SPEED: u64 = 20;
 
+pub(crate) const TERRAIN_OBSTACLE_SPEED: u64 = 10;
+pub(crate) const TERRAIN_OBSTACLE_COLOR: u8 = 93;
+
 #[derive(Debug, Default)]
 pub(crate) struct App {
     player: Player,
+    terrain: Terrain,
 }
 
 impl App {}
@@ -29,7 +40,8 @@ impl terge::App for App {
     fn draw(&self, gfx: &mut terge::gfx::Gfx) {
         gfx.clear_screen();
 
-        self.player.draw(&gfx);
+        self.player.draw(gfx);
+        self.terrain.draw(gfx);
     }
 
     fn update(
@@ -48,8 +60,56 @@ impl terge::App for App {
         }
 
         self.player.update(gfx);
+        self.terrain.update(gfx);
 
         true
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct Terrain {
+    obstacles: VecDeque<U16Point>,
+    frame_counter: u64,
+}
+
+impl Terrain {
+    pub(crate) fn update(&mut self, gfx: &mut Gfx) {
+        self.frame_counter = (self.frame_counter + 1) % TERRAIN_OBSTACLE_SPEED;
+
+        // Cleanup obstacles.
+        loop {
+            if let Some(obstacle) = self.obstacles.front() {
+                if obstacle.0 == 0 {
+                    self.obstacles
+                        .pop_front()
+                        .expect("Failed removing front obstacle");
+                    continue;
+                }
+            }
+            break;
+        }
+
+        // Move obstacles.
+        for obstacle in self.obstacles.iter_mut() {
+            obstacle.0 -= 1;
+        }
+
+        // New obstacles.
+        let rand_u8: u8 = rand::random();
+        if rand_u8 >= 250 {
+            let rand_h: u8 = rand::random::<u8>() % 10 + 2;
+            self.obstacles.push_back((gfx.width - 1, rand_h as u16));
+        }
+    }
+
+    pub(crate) fn draw(&self, gfx: &Gfx) {
+        let floor = gfx.height - FLOOR_OFFS_FROM_BOTTOM;
+
+        for obstacle in &self.obstacles {
+            for i in 0..obstacle.1 {
+                gfx.draw_text("#", obstacle.0, floor - i, TERRAIN_OBSTACLE_COLOR);
+            }
+        }
     }
 }
 
