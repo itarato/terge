@@ -107,7 +107,7 @@ impl terge::App for App {
 
 #[derive(Debug)]
 pub(crate) enum DecorationType {
-    GrassMini,
+    Stone,
     GrassSmall,
     GrassMedium,
     GrassLeanLeft,
@@ -117,7 +117,7 @@ pub(crate) enum DecorationType {
 impl DecorationType {
     fn random() -> Self {
         match rand::random::<u8>() % 5 {
-            0 => Self::GrassMini,
+            0 => Self::Stone,
             1 => Self::GrassSmall,
             2 => Self::GrassMedium,
             3 => Self::GrassLeanLeft,
@@ -318,14 +318,14 @@ impl Terrain {
         let floor = floor(gfx);
 
         for decor in &self.decorations {
-            let decor_str = match decor.ty {
-                DecorationType::GrassMini => ".",
-                DecorationType::GrassSmall => ",",
-                DecorationType::GrassMedium => "v",
-                DecorationType::GrassLeanLeft => "╮",
-                DecorationType::GrassLeanRight => "╭",
+            let (decor_str, color) = match decor.ty {
+                DecorationType::Stone => ("🬞", 90),
+                DecorationType::GrassSmall => ("🬞", 32),
+                DecorationType::GrassMedium => ("🬵", 32),
+                DecorationType::GrassLeanLeft => ("╮", 92),
+                DecorationType::GrassLeanRight => ("╭", 92),
             };
-            gfx.draw_text(decor_str, decor.x as u16, floor, 92);
+            gfx.draw_text(decor_str, decor.x as u16, floor, color);
         }
 
         for (obstacle_x, obstacle_y) in &self.obstacles {
@@ -468,6 +468,10 @@ impl Player {
     }
 
     pub(crate) fn die(&mut self) {
+        if self.dead {
+            return;
+        }
+
         self.dead = true;
 
         for _ in 0..32 {
