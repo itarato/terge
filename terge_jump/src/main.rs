@@ -7,35 +7,23 @@ use terge::{
     gfx::Gfx,
 };
 
-pub(crate) const PLAYER_COLOR: u8 = 95;
+pub(crate) const PLAYER_COLOR: u8 = 97;
 pub(crate) const PLAYER_VY_SLOWDOWN: f32 = 0.9;
 pub(crate) const PLAYER_VY_ACC: f32 = 1.15;
 pub(crate) const PLAYER_VY_MAX: f32 = 2.0;
 pub(crate) const PLAYER_VY_FALLBACK_THRESHOLD: f32 = 0.2;
+pub(crate) const PLAYER_X: u16 = 10;
 
 //                                              Medium       Tall         Long         Short
 pub(crate) const JUMP_SETTING: [F32Point; 4] = [(-1.7, 1.2), (-2.2, 1.4), (-1.0, 2.5), (-1.0, 0.4)];
 
 pub(crate) const FLOOR_OFFS_FROM_BOTTOM: u16 = 6;
 
-//   O
-//  />
-// /\.
-
-//   O
-//  /\
-//  |.
-
-//   O
-//  /v
-// v|.
-
-pub(crate) const PLAYER_SPRITE: [[&'static str; 3]; 2] =
-    [["  O", " />", "o+O"], [" O", " />", "o-O"]];
+pub(crate) const PLAYER_SPRITE: [[&'static str; 1]; 4] = [["🯅"], ["🯇"], ["🯅"], ["🯈"]];
 pub(crate) const PLAYER_SPRITE_SPEED: u64 = 20;
 
 pub(crate) const TERRAIN_OBSTACLE_DEFAULT_SPEED: f32 = 1.0;
-pub(crate) const TERRAIN_OBSTACLE_COLOR: u8 = 93;
+pub(crate) const TERRAIN_OBSTACLE_COLORS: [u8; 2] = [91, 97];
 
 fn floor(gfx: &Gfx) -> u16 {
     gfx.height - FLOOR_OFFS_FROM_BOTTOM
@@ -51,7 +39,7 @@ impl App {}
 
 impl terge::App for App {
     fn reset(&mut self, gfx: &mut terge::gfx::Gfx) {
-        self.player.pos = (10.0, floor(gfx) as f32);
+        self.player.pos = (PLAYER_X as f32, floor(gfx) as f32);
 
         self.player.reset();
         self.terrain.reset();
@@ -62,6 +50,10 @@ impl terge::App for App {
 
         self.terrain.draw(gfx);
         self.player.draw(gfx);
+
+        if self.player.dead {
+            gfx.draw_text("-== DEAD ==-", gfx.width / 2 - 6, gfx.height / 3, 91);
+        }
     }
 
     fn update(
@@ -103,6 +95,7 @@ impl terge::App for App {
 
         if self.terrain.did_collide_with_frame(self.player.frame()) {
             self.player.die();
+            self.terrain.game_over = true;
         }
 
         true
@@ -111,7 +104,6 @@ impl terge::App for App {
 
 #[derive(Debug)]
 pub(crate) enum DecorationType {
-    Blood,
     GrassSmall,
     GrassMedium,
 }
@@ -133,12 +125,14 @@ pub(crate) struct Terrain {
     obstacles: VecDeque<(f32, U16Point)>,
     speed: f32,
     decorations: VecDeque<Decoration>,
+    game_over: bool,
 }
 
 impl Terrain {
     pub(crate) fn reset(&mut self) {
         self.obstacles.clear();
         self.speed = TERRAIN_OBSTACLE_DEFAULT_SPEED;
+        self.game_over = false;
     }
 
     pub(crate) fn update(&mut self, gfx: &mut Gfx) {
@@ -202,14 +196,18 @@ impl Terrain {
         }
 
         // Regulate speed.
-        let diff = self.speed - TERRAIN_OBSTACLE_DEFAULT_SPEED;
-        if diff != 0.0 {
-            static SPEED_ADJUST: f32 = 0.98;
-            let new_diff = diff * SPEED_ADJUST;
-            self.speed = TERRAIN_OBSTACLE_DEFAULT_SPEED + new_diff;
+        if self.game_over {
+            self.speed *= 0.95;
+        } else {
+            let diff = self.speed - TERRAIN_OBSTACLE_DEFAULT_SPEED;
+            if diff != 0.0 {
+                static SPEED_ADJUST: f32 = 0.98;
+                let new_diff = diff * SPEED_ADJUST;
+                self.speed = TERRAIN_OBSTACLE_DEFAULT_SPEED + new_diff;
 
-            if (self.speed - TERRAIN_OBSTACLE_DEFAULT_SPEED).abs() < 0.1 {
-                self.speed = TERRAIN_OBSTACLE_DEFAULT_SPEED;
+                if (self.speed - TERRAIN_OBSTACLE_DEFAULT_SPEED).abs() < 0.1 {
+                    self.speed = TERRAIN_OBSTACLE_DEFAULT_SPEED;
+                }
             }
         }
     }
@@ -221,7 +219,12 @@ impl Terrain {
             if (*obstacle_x as u16) < gfx.width {
                 let obstacle_height = obstacle_y.1 - obstacle_y.0;
                 for i in 0..obstacle_height as u16 {
-                    gfx.draw_text("#c", *obstacle_x as u16, floor - i, TERRAIN_OBSTACLE_COLOR);
+                    gfx.draw_text(
+                        "▓",
+                        *obstacle_x as u16,
+                        floor - i,
+                        TERRAIN_OBSTACLE_COLORS[i as usize % TERRAIN_OBSTACLE_COLORS.len()],
+                    );
                 }
             }
         }
@@ -233,9 +236,6 @@ impl Terrain {
                 }
                 DecorationType::GrassMedium => {
                     gfx.draw_text("v", decor.x as u16, floor, 92);
-                }
-                DecorationType::Blood => {
-                    gfx.draw_text("_", decor.x as u16, floor, 91);
                 }
             }
         }
@@ -278,15 +278,18 @@ impl Player {
     pub(crate) fn draw(&self, gfx: &Gfx) {
         let player_sprite_idx =
             self.sprite_counter / (PLAYER_SPRITE_SPEED / PLAYER_SPRITE.len() as u64);
-        for i in 0..3 {
+        let sprite = PLAYER_SPRITE[player_sprite_idx as usize];
+        for i in 0..sprite.len() {
             gfx.draw_text(
-                PLAYER_SPRITE[player_sprite_idx as usize][i],
+                sprite[i],
                 self.pos.0 as u16,
-                (self.pos.1 - PLAYER_SPRITE[player_sprite_idx as usize].len() as f32
-                    + 1.0
-                    + i as f32) as u16,
+                (self.pos.1 - sprite.len() as f32 + 1.0 + i as f32) as u16,
                 PLAYER_COLOR,
             );
+        }
+
+        if self.dead {
+            gfx.draw_text("▁▁▁▁▁▁▂▂▂▃", 0, floor(gfx), 91);
         }
     }
 
@@ -336,8 +339,8 @@ impl Player {
 
     pub(crate) fn frame(&self) -> (U16Point, U16Point) {
         (
-            (self.pos.0 as u16, (self.pos.1 - 2.0) as u16),
-            ((self.pos.0 + 2.0) as u16, self.pos.1 as u16),
+            (self.pos.0 as u16, (self.pos.1) as u16),
+            ((self.pos.0) as u16, self.pos.1 as u16),
         )
     }
 
