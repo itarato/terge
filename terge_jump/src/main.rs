@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 
 use crossterm::event::{Event, KeyCode};
-use rand::random;
 use terge::{
     Terge,
     common::{F32Point, U16Point, u16_range_overlap, u16_value_included_in_range},
