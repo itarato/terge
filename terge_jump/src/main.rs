@@ -60,8 +60,8 @@ impl terge::App for App {
     fn draw(&self, gfx: &mut terge::gfx::Gfx) {
         gfx.clear_screen();
 
-        self.player.draw(gfx);
         self.terrain.draw(gfx);
+        self.player.draw(gfx);
     }
 
     fn update(
@@ -109,10 +109,30 @@ impl terge::App for App {
     }
 }
 
+#[derive(Debug)]
+pub(crate) enum DecorationType {
+    Blood,
+    GrassSmall,
+    GrassMedium,
+}
+
+#[derive(Debug)]
+pub(crate) struct Decoration {
+    ty: DecorationType,
+    x: f32,
+}
+
+impl Decoration {
+    pub(crate) fn new(ty: DecorationType, x: f32) -> Self {
+        Self { ty, x }
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Terrain {
     obstacles: VecDeque<(f32, U16Point)>,
     speed: f32,
+    decorations: VecDeque<Decoration>,
 }
 
 impl Terrain {
@@ -122,6 +142,16 @@ impl Terrain {
     }
 
     pub(crate) fn update(&mut self, gfx: &mut Gfx) {
+        // Move obstacles.
+        for obstacle in &mut self.obstacles {
+            obstacle.0 -= self.speed;
+        }
+
+        // Move decorations.
+        for decor in &mut self.decorations {
+            decor.x -= self.speed;
+        }
+
         // Cleanup obstacles.
         loop {
             if let Some(obstacle) = self.obstacles.front() {
@@ -135,9 +165,17 @@ impl Terrain {
             break;
         }
 
-        // Move obstacles.
-        for obstacle in self.obstacles.iter_mut() {
-            obstacle.0 -= self.speed;
+        // Cleanup decorations.
+        loop {
+            if let Some(decor) = self.decorations.front() {
+                if decor.x <= 0.0 {
+                    self.decorations
+                        .pop_front()
+                        .expect("Failed removing front decoration");
+                    continue;
+                }
+            }
+            break;
         }
 
         // New obstacles.
@@ -147,6 +185,20 @@ impl Terrain {
             let rand_h: u16 = rand::random::<u16>() % 10 + 2;
             self.obstacles
                 .push_back((gfx.width as f32, (floor - rand_h, floor)));
+        }
+
+        // New decoration.
+        let rand_u8: u8 = rand::random();
+        if rand_u8 >= 200 {
+            let decor_type = rand::random::<u8>() % 2;
+            self.decorations.push_back(Decoration::new(
+                match decor_type {
+                    0 => DecorationType::GrassSmall,
+                    1 => DecorationType::GrassMedium,
+                    _ => unreachable!(),
+                },
+                (gfx.width - 1) as f32,
+            ));
         }
 
         // Regulate speed.
@@ -169,7 +221,21 @@ impl Terrain {
             if (*obstacle_x as u16) < gfx.width {
                 let obstacle_height = obstacle_y.1 - obstacle_y.0;
                 for i in 0..obstacle_height as u16 {
-                    gfx.draw_text("#", *obstacle_x as u16, floor - i, TERRAIN_OBSTACLE_COLOR);
+                    gfx.draw_text("#c", *obstacle_x as u16, floor - i, TERRAIN_OBSTACLE_COLOR);
+                }
+            }
+        }
+
+        for decor in &self.decorations {
+            match decor.ty {
+                DecorationType::GrassSmall => {
+                    gfx.draw_text(",", decor.x as u16, floor, 92);
+                }
+                DecorationType::GrassMedium => {
+                    gfx.draw_text("v", decor.x as u16, floor, 92);
+                }
+                DecorationType::Blood => {
+                    gfx.draw_text("_", decor.x as u16, floor, 91);
                 }
             }
         }
@@ -201,7 +267,7 @@ pub(crate) struct Player {
     pos: F32Point,
     v: F32Point,
     sprite_counter: u64,
-    dead: bool,
+    pub dead: bool,
 }
 
 impl Player {
@@ -216,7 +282,9 @@ impl Player {
             gfx.draw_text(
                 PLAYER_SPRITE[player_sprite_idx as usize][i],
                 self.pos.0 as u16,
-                (self.pos.1 - 2.0 + i as f32) as u16,
+                (self.pos.1 - PLAYER_SPRITE[player_sprite_idx as usize].len() as f32
+                    + 1.0
+                    + i as f32) as u16,
                 PLAYER_COLOR,
             );
         }
