@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use crossterm::event::{Event, KeyCode};
+use rand::random;
 use terge::{
     Terge,
     common::{F32Point, U16Point, u16_range_overlap, u16_value_included_in_range},
@@ -15,7 +16,7 @@ pub(crate) const PLAYER_VY_FALLBACK_THRESHOLD: f32 = 0.2;
 pub(crate) const PLAYER_X: u16 = 10;
 
 //                                              Medium       Tall         Long         Short
-pub(crate) const JUMP_SETTING: [F32Point; 4] = [(-1.7, 1.2), (-2.2, 1.4), (-1.0, 2.5), (-1.0, 0.4)];
+pub(crate) const JUMP_SETTING: [F32Point; 4] = [(-1.7, 1.1), (-2.2, 1.2), (-1.0, 2.5), (-1.0, 0.4)];
 
 pub(crate) const FLOOR_OFFS_FROM_BOTTOM: u16 = 6;
 
@@ -123,6 +124,31 @@ impl Decoration {
     }
 }
 
+pub(crate) enum ObstacleType {
+    OneSmall,
+    LongSmall,
+    OneMedium,
+    TwoMedium,
+    ThreeMedium,
+    OneTall,
+    TwoTall,
+}
+
+impl ObstacleType {
+    fn random() -> Self {
+        match rand::random::<u8>() % 7 {
+            0 => Self::OneSmall,
+            1 => Self::LongSmall,
+            2 => Self::OneMedium,
+            3 => Self::TwoMedium,
+            4 => Self::ThreeMedium,
+            5 => Self::OneTall,
+            6 => Self::TwoTall,
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Terrain {
     obstacles: VecDeque<(f32, U16Point)>,
@@ -135,6 +161,7 @@ pub(crate) struct Terrain {
 impl Terrain {
     pub(crate) fn reset(&mut self) {
         self.obstacles.clear();
+        self.decorations.clear();
         self.speed = TERRAIN_OBSTACLE_DEFAULT_SPEED;
         self.game_over = false;
     }
@@ -186,12 +213,56 @@ impl Terrain {
         if last_obstacle_enough_far {
             let rand_u8: u8 = rand::random();
             let floor = floor(gfx);
-            if rand_u8 >= 200 {
-                let rand_h: u16 = rand::random::<u16>() % 10 + 2;
-                self.obstacles
-                    .push_back((gfx.width as f32, (floor - rand_h, floor)));
-
-                self.obstacle_delay = 50;
+            if rand_u8 >= 220 || true {
+                match ObstacleType::random() {
+                    ObstacleType::OneSmall => {
+                        self.obstacles
+                            .push_back((gfx.width as f32, (floor - 2, floor)));
+                        self.obstacle_delay = 30;
+                    }
+                    ObstacleType::OneTall => {
+                        self.obstacles
+                            .push_back((gfx.width as f32, (floor - 16, floor)));
+                        self.obstacle_delay = 70;
+                    }
+                    ObstacleType::TwoTall => {
+                        self.obstacles
+                            .push_back((gfx.width as f32, (floor - 16, floor)));
+                        self.obstacles
+                            .push_back((gfx.width as f32 + 8.0, (floor - 16, floor)));
+                        self.obstacle_delay = 70;
+                    }
+                    ObstacleType::LongSmall => {
+                        for i in -4i32..=4i32 {
+                            self.obstacles.push_back((
+                                gfx.width as f32 + (i as f32 + 4.0) * 5.0,
+                                (floor - 4 + i.abs() as u16 / 2, floor),
+                            ));
+                        }
+                        self.obstacle_delay = 70;
+                    }
+                    ObstacleType::OneMedium => {
+                        self.obstacles
+                            .push_back((gfx.width as f32, (floor - 10, floor)));
+                        self.obstacle_delay = 50;
+                    }
+                    ObstacleType::TwoMedium => {
+                        self.obstacles
+                            .push_back((gfx.width as f32, (floor - 10, floor)));
+                        self.obstacles
+                            .push_back((gfx.width as f32 + 8.0, (floor - 10, floor)));
+                        self.obstacle_delay = 55;
+                    }
+                    ObstacleType::ThreeMedium => {
+                        self.obstacles
+                            .push_back((gfx.width as f32, (floor - 10, floor)));
+                        self.obstacles
+                            .push_back((gfx.width as f32 + 6.0, (floor - 10, floor)));
+                        self.obstacles
+                            .push_back((gfx.width as f32 + 12.0, (floor - 10, floor)));
+                        self.obstacle_delay = 60;
+                    }
+                }
             }
         }
 
