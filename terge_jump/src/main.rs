@@ -15,7 +15,7 @@ pub(crate) const PLAYER_VY_MAX: f32 = 2.0;
 pub(crate) const PLAYER_VY_FALLBACK_THRESHOLD: f32 = 0.2;
 
 //                                              Medium       Tall         Long         Short
-pub(crate) const JUMP_SETTING: [F32Point; 4] = [(-2.0, 2.0), (-3.0, 2.0), (-1.0, 4.0), (-1.0, 0.5)];
+pub(crate) const JUMP_SETTING: [F32Point; 4] = [(-1.7, 1.2), (-2.2, 1.4), (-1.0, 2.5), (-1.0, 0.4)];
 
 pub(crate) const FLOOR_OFFS_FROM_BOTTOM: u16 = 6;
 
@@ -55,20 +55,24 @@ impl terge::App for App {
             match &event {
                 Event::Key(key_event) => match &key_event.code {
                     KeyCode::Char('w') => {
-                        self.player.jump(JUMP_SETTING[1].0);
-                        self.terrain.set_speed(JUMP_SETTING[1].1);
+                        if self.player.jump(JUMP_SETTING[1].0, &gfx) {
+                            self.terrain.set_speed(JUMP_SETTING[1].1);
+                        }
                     }
                     KeyCode::Char('s') => {
-                        self.player.jump(JUMP_SETTING[0].0);
-                        self.terrain.set_speed(JUMP_SETTING[0].1);
+                        if self.player.jump(JUMP_SETTING[0].0, gfx) {
+                            self.terrain.set_speed(JUMP_SETTING[0].1);
+                        }
                     }
                     KeyCode::Char('a') => {
-                        self.player.jump(JUMP_SETTING[3].0);
-                        self.terrain.set_speed(JUMP_SETTING[3].1);
+                        if self.player.jump(JUMP_SETTING[3].0, gfx) {
+                            self.terrain.set_speed(JUMP_SETTING[3].1);
+                        }
                     }
                     KeyCode::Char('d') => {
-                        self.player.jump(JUMP_SETTING[2].0);
-                        self.terrain.set_speed(JUMP_SETTING[2].1);
+                        if self.player.jump(JUMP_SETTING[2].0, gfx) {
+                            self.terrain.set_speed(JUMP_SETTING[2].1);
+                        }
                     }
                     _ => {}
                 },
@@ -120,7 +124,7 @@ impl Terrain {
         // Regulate speed.
         let diff = self.speed - TERRAIN_OBSTACLE_DEFAULT_SPEED;
         if diff != 0.0 {
-            static SPEED_ADJUST: f32 = 0.95;
+            static SPEED_ADJUST: f32 = 0.98;
             let new_diff = diff * SPEED_ADJUST;
             self.speed = TERRAIN_OBSTACLE_DEFAULT_SPEED + new_diff;
 
@@ -138,6 +142,10 @@ impl Terrain {
                 gfx.draw_text("#", obstacle.0 as u16, floor - i, TERRAIN_OBSTACLE_COLOR);
             }
         }
+
+        gfx.draw_text(&"▒".repeat(gfx.width as usize), 0, floor + 1, 32);
+        gfx.draw_text(&"▓".repeat(gfx.width as usize), 0, floor + 2, 33);
+        gfx.draw_text(&"░".repeat(gfx.width as usize), 0, floor + 3, 33);
     }
 
     pub(crate) fn set_speed(&mut self, speed: f32) {
@@ -166,8 +174,18 @@ impl Player {
         }
     }
 
-    pub(crate) fn jump(&mut self, force: f32) {
-        self.v.1 = force;
+    fn is_on_ground(&self, gfx: &Gfx) -> bool {
+        let floor: f32 = (gfx.height - FLOOR_OFFS_FROM_BOTTOM) as f32;
+        (floor - self.pos.1).abs() < 0.1
+    }
+
+    pub(crate) fn jump(&mut self, force: f32, gfx: &Gfx) -> bool {
+        if self.is_on_ground(gfx) {
+            self.v.1 = force;
+            true
+        } else {
+            false
+        }
     }
 
     pub(crate) fn update(&mut self, gfx: &mut Gfx) {
