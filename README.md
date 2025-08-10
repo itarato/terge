@@ -13,7 +13,7 @@ Examples:
 ---
 
 Bugs:
--
+- jumper: if player has high speed the collision detector misses hits
 
 Feature request:
 -
