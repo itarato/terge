@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use crossterm::event::{Event, KeyCode};
 use terge::{
     Terge,
-    common::{F32Point, U16Point, u16_range_overlap, u16_value_included_in_range},
+    common::{Arithmetics, F32Point, U16Point, u16_range_overlap, u16_value_included_in_range},
     gfx::Gfx,
 };
 
@@ -370,6 +370,7 @@ pub(crate) struct Player {
     v: F32Point,
     sprite_counter: u64,
     pub dead: bool,
+    bloods: Vec<(F32Point, F32Point)>,
 }
 
 impl Player {
@@ -392,6 +393,10 @@ impl Player {
 
         if self.dead {
             gfx.draw_text("▁▁▁▁▁▁▂▂▂▃", 0, floor(gfx), 91);
+
+            for (blood_pos, _blood_v) in &self.bloods {
+                gfx.draw_text("*", blood_pos.0 as u16, blood_pos.1 as u16, 31);
+            }
         }
     }
 
@@ -411,7 +416,23 @@ impl Player {
 
     pub(crate) fn update(&mut self, gfx: &mut Gfx) {
         self.update_height(gfx);
+        self.update_blood(gfx);
         self.sprite_counter = (self.sprite_counter + 1) % PLAYER_SPRITE_SPEED;
+    }
+
+    fn update_blood(&mut self, gfx: &Gfx) {
+        for (blood_pos, blood_v) in &mut self.bloods {
+            blood_v.1 += 0.01;
+            blood_pos.0 += blood_v.0;
+            blood_pos.1 += blood_v.1;
+        }
+
+        self.bloods.retain(|(blood_pos, _blood_v)| {
+            blood_pos.0 >= 0.0
+                && blood_pos.1 >= 0.0
+                && blood_pos.0 < gfx.width as f32
+                && blood_pos.1 < gfx.height as f32
+        });
     }
 
     fn update_height(&mut self, gfx: &mut Gfx) {
@@ -448,6 +469,15 @@ impl Player {
 
     pub(crate) fn die(&mut self) {
         self.dead = true;
+
+        for _ in 0..32 {
+            let blood_pos = self.pos;
+            let blood_v = (
+                rand::random::<f32>() % 1.0 - 0.5,
+                rand::random::<f32>() % 1.0 - 0.5,
+            );
+            self.bloods.push((blood_pos, blood_v));
+        }
     }
 }
 

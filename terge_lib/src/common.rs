@@ -89,6 +89,20 @@ impl Arithmetics<U16Point, u16> for U16Point {
     }
 }
 
+impl Arithmetics<F32Point, f32> for F32Point {
+    fn add(&self, other: F32Point) -> F32Point {
+        (self.0 + other.0, self.1 + other.1)
+    }
+
+    fn sub(&self, other: F32Point) -> F32Point {
+        (self.0 - other.0, self.1 - other.1)
+    }
+
+    fn div(&self, divisor: f32) -> F32Point {
+        (self.0 / divisor, self.1 / divisor)
+    }
+}
+
 pub fn point_pair_minmax(lhs: U16Point, rhs: U16Point) -> (u16, u16, u16, u16) {
     (
         lhs.0.min(rhs.0),
