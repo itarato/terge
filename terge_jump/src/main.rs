@@ -108,8 +108,24 @@ impl terge::App for App {
 
 #[derive(Debug)]
 pub(crate) enum DecorationType {
+    GrassMini,
     GrassSmall,
     GrassMedium,
+    GrassLeanLeft,
+    GrassLeanRight,
+}
+
+impl DecorationType {
+    fn random() -> Self {
+        match rand::random::<u8>() % 5 {
+            0 => Self::GrassMini,
+            1 => Self::GrassSmall,
+            2 => Self::GrassMedium,
+            3 => Self::GrassLeanLeft,
+            4 => Self::GrassLeanRight,
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -275,13 +291,8 @@ impl Terrain {
         if last_decoration_enough_far {
             let rand_u8: u8 = rand::random();
             if rand_u8 >= 200 {
-                let decor_type = rand::random::<u8>() % 2;
                 self.decorations.push_back(Decoration::new(
-                    match decor_type {
-                        0 => DecorationType::GrassSmall,
-                        1 => DecorationType::GrassMedium,
-                        _ => unreachable!(),
-                    },
+                    DecorationType::random(),
                     (gfx.width - 1) as f32,
                 ));
             }
@@ -308,14 +319,14 @@ impl Terrain {
         let floor = floor(gfx);
 
         for decor in &self.decorations {
-            match decor.ty {
-                DecorationType::GrassSmall => {
-                    gfx.draw_text(",", decor.x as u16, floor, 92);
-                }
-                DecorationType::GrassMedium => {
-                    gfx.draw_text("v", decor.x as u16, floor, 92);
-                }
-            }
+            let decor_str = match decor.ty {
+                DecorationType::GrassMini => ".",
+                DecorationType::GrassSmall => ",",
+                DecorationType::GrassMedium => "v",
+                DecorationType::GrassLeanLeft => "╮",
+                DecorationType::GrassLeanRight => "╭",
+            };
+            gfx.draw_text(decor_str, decor.x as u16, floor, 92);
         }
 
         for (obstacle_x, obstacle_y) in &self.obstacles {
