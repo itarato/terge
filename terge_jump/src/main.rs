@@ -84,6 +84,9 @@ impl terge::App for App {
                             self.terrain.set_speed(JUMP_SETTING[2].1);
                         }
                     }
+                    KeyCode::Char('r') => {
+                        self.reset(gfx);
+                    }
                     _ => {}
                 },
                 _ => {}
@@ -126,6 +129,7 @@ pub(crate) struct Terrain {
     speed: f32,
     decorations: VecDeque<Decoration>,
     game_over: bool,
+    obstacle_delay: u16,
 }
 
 impl Terrain {
@@ -173,26 +177,43 @@ impl Terrain {
         }
 
         // New obstacles.
-        let rand_u8: u8 = rand::random();
-        let floor = floor(gfx);
-        if rand_u8 >= 250 {
-            let rand_h: u16 = rand::random::<u16>() % 10 + 2;
-            self.obstacles
-                .push_back((gfx.width as f32, (floor - rand_h, floor)));
+        let last_obstacle_enough_far = self
+            .obstacles
+            .back()
+            .map(|obstacle| gfx.width as f32 - obstacle.0 > self.obstacle_delay as f32)
+            .unwrap_or(true);
+
+        if last_obstacle_enough_far {
+            let rand_u8: u8 = rand::random();
+            let floor = floor(gfx);
+            if rand_u8 >= 200 {
+                let rand_h: u16 = rand::random::<u16>() % 10 + 2;
+                self.obstacles
+                    .push_back((gfx.width as f32, (floor - rand_h, floor)));
+
+                self.obstacle_delay = 50;
+            }
         }
 
         // New decoration.
-        let rand_u8: u8 = rand::random();
-        if rand_u8 >= 200 {
-            let decor_type = rand::random::<u8>() % 2;
-            self.decorations.push_back(Decoration::new(
-                match decor_type {
-                    0 => DecorationType::GrassSmall,
-                    1 => DecorationType::GrassMedium,
-                    _ => unreachable!(),
-                },
-                (gfx.width - 1) as f32,
-            ));
+        let last_decoration_enough_far = self
+            .decorations
+            .back()
+            .map(|decor| gfx.width as f32 - decor.x as f32 > 2.0)
+            .unwrap_or(true);
+        if last_decoration_enough_far {
+            let rand_u8: u8 = rand::random();
+            if rand_u8 >= 200 {
+                let decor_type = rand::random::<u8>() % 2;
+                self.decorations.push_back(Decoration::new(
+                    match decor_type {
+                        0 => DecorationType::GrassSmall,
+                        1 => DecorationType::GrassMedium,
+                        _ => unreachable!(),
+                    },
+                    (gfx.width - 1) as f32,
+                ));
+            }
         }
 
         // Regulate speed.
@@ -215,6 +236,17 @@ impl Terrain {
     pub(crate) fn draw(&self, gfx: &Gfx) {
         let floor = floor(gfx);
 
+        for decor in &self.decorations {
+            match decor.ty {
+                DecorationType::GrassSmall => {
+                    gfx.draw_text(",", decor.x as u16, floor, 92);
+                }
+                DecorationType::GrassMedium => {
+                    gfx.draw_text("v", decor.x as u16, floor, 92);
+                }
+            }
+        }
+
         for (obstacle_x, obstacle_y) in &self.obstacles {
             if (*obstacle_x as u16) < gfx.width {
                 let obstacle_height = obstacle_y.1 - obstacle_y.0;
@@ -225,17 +257,6 @@ impl Terrain {
                         floor - i,
                         TERRAIN_OBSTACLE_COLORS[i as usize % TERRAIN_OBSTACLE_COLORS.len()],
                     );
-                }
-            }
-        }
-
-        for decor in &self.decorations {
-            match decor.ty {
-                DecorationType::GrassSmall => {
-                    gfx.draw_text(",", decor.x as u16, floor, 92);
-                }
-                DecorationType::GrassMedium => {
-                    gfx.draw_text("v", decor.x as u16, floor, 92);
                 }
             }
         }
