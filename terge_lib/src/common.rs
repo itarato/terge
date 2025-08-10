@@ -41,6 +41,20 @@ pub fn u16point_to_i32point(p: U16Point) -> I32Point {
     (p.0 as i32, p.1 as i32)
 }
 
+pub fn f32point_to_u16point(p: F32Point) -> U16Point {
+    (p.0 as u16, p.1 as u16)
+}
+
+/// range must be ordered.
+pub fn u16_value_included_in_range(v: u16, range: U16Point) -> bool {
+    range.0 <= v && range.1 >= v
+}
+
+/// ranges must be ordered
+pub fn u16_range_overlap(lhs: U16Point, rhs: U16Point) -> bool {
+    !(rhs.1 < lhs.0 || rhs.0 > lhs.1)
+}
+
 pub trait Arithmetics<TPair, T> {
     fn add(&self, other: TPair) -> TPair;
     fn sub(&self, other: TPair) -> TPair;
