@@ -103,7 +103,7 @@ impl Player {
 
     pub(crate) fn frame(&self) -> (U16Point, U16Point) {
         (
-            (self.pos.0 as u16, (self.pos.1) as u16),
+            (self.pos.0 as u16, (self.pos.1) as u16 - 1),
             ((self.pos.0) as u16, self.pos.1 as u16),
         )
     }

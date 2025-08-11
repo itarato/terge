@@ -162,9 +162,9 @@ impl Terrain {
 
         for decor in &self.decorations {
             let (decor_str, color) = match decor.ty {
-                DecorationType::Stone => ("🬞", 90),
-                DecorationType::GrassSmall => ("🬞", 32),
-                DecorationType::GrassMedium => ("🬵", 32),
+                DecorationType::Stone => (".", 90),
+                DecorationType::GrassSmall => (",", 32),
+                DecorationType::GrassMedium => ("v", 32),
                 DecorationType::GrassLeanLeft => ("╮", 92),
                 DecorationType::GrassLeanRight => ("╭", 92),
             };

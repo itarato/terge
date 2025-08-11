@@ -12,7 +12,8 @@ pub(crate) const JUMP_SETTING: [F32Point; 4] = [(-1.7, 1.1), (-2.2, 1.2), (-1.0,
 
 pub(crate) const FLOOR_OFFS_FROM_BOTTOM: u16 = 6;
 
-pub(crate) const PLAYER_SPRITE: [[&'static str; 1]; 4] = [["🯅"], ["🯇"], ["🯅"], ["🯈"]];
+pub(crate) const PLAYER_SPRITE: [[&'static str; 2]; 4] =
+    [["O", "^"], ["O", "<"], ["O", "v"], ["O", ">"]];
 pub(crate) const PLAYER_SPRITE_SPEED: u64 = 20;
 
 pub(crate) const TERRAIN_OBSTACLE_DEFAULT_SPEED: f32 = 1.0;
