@@ -1,17 +1,31 @@
 use terge::{
-    common::{F32Point, U16Point},
+    common::{F32Point, Gravity, U16Point},
     gfx::Gfx,
 };
 
 use crate::common::*;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct Player {
     pub(crate) pos: F32Point,
     pub(crate) v: F32Point,
     pub(crate) sprite_counter: u64,
     pub(crate) dead: bool,
     pub(crate) bloods: Vec<(F32Point, F32Point)>,
+    blood_g: Gravity,
+}
+
+impl Default for Player {
+    fn default() -> Self {
+        Self {
+            blood_g: Gravity::new(1.04, 0.2),
+            pos: Default::default(),
+            v: Default::default(),
+            sprite_counter: 0,
+            dead: false,
+            bloods: vec![],
+        }
+    }
 }
 
 impl Player {
@@ -66,6 +80,8 @@ impl Player {
             blood_v.1 += 0.01;
             blood_pos.0 += blood_v.0;
             blood_pos.1 += blood_v.1;
+
+            self.blood_g.apply(blood_pos, blood_v);
         }
 
         self.bloods.retain(|(blood_pos, _blood_v)| {

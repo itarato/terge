@@ -187,3 +187,34 @@ pub fn multiline_text_line_start(
 
     (x, y)
 }
+
+#[derive(Debug)]
+pub struct Gravity {
+    g: f32,
+    max_vy: f32,
+}
+
+impl Gravity {
+    pub fn new(g: f32, max_vy: f32) -> Self {
+        Self { g, max_vy }
+    }
+
+    pub fn apply(&self, p: &mut F32Point, v: &mut F32Point) {
+        static FLOAT_ZERO_THRESHOLD: f32 = 0.2;
+
+        if v.1 < 0.0 {
+            // Raising up.
+            v.1 *= 1.0 / self.g;
+
+            // Falling back.
+            if v.1.abs() <= FLOAT_ZERO_THRESHOLD {
+                v.1 = FLOAT_ZERO_THRESHOLD;
+            }
+        } else {
+            // Falling down.
+            v.1 = self.max_vy.min(v.1 * self.g);
+        }
+
+        p.1 += v.1;
+    }
+}
