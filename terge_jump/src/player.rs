@@ -13,17 +13,19 @@ pub(crate) struct Player {
     pub(crate) dead: bool,
     pub(crate) bloods: Vec<(F32Point, F32Point)>,
     blood_g: Gravity,
+    jump_g: Gravity,
 }
 
 impl Default for Player {
     fn default() -> Self {
         Self {
-            blood_g: Gravity::new(1.04, 0.2),
             pos: Default::default(),
             v: Default::default(),
             sprite_counter: 0,
             dead: false,
             bloods: vec![],
+            blood_g: Gravity::new(1.03, 1.0),
+            jump_g: Gravity::new(1.1, 2.0),
         }
     }
 }
@@ -77,11 +79,8 @@ impl Player {
 
     fn update_blood(&mut self, gfx: &Gfx) {
         for (blood_pos, blood_v) in &mut self.bloods {
-            blood_v.1 += 0.01;
-            blood_pos.0 += blood_v.0;
-            blood_pos.1 += blood_v.1;
-
             self.blood_g.apply(blood_pos, blood_v);
+            blood_pos.0 += blood_v.0;
         }
 
         self.bloods.retain(|(blood_pos, _blood_v)| {
@@ -93,20 +92,7 @@ impl Player {
     }
 
     fn update_height(&mut self, gfx: &mut Gfx) {
-        if self.v.1 < 0.0 {
-            // Raising up.
-            self.v.1 *= PLAYER_VY_SLOWDOWN;
-
-            // Falling back.
-            if self.v.1.abs() <= PLAYER_VY_FALLBACK_THRESHOLD {
-                self.v.1 = PLAYER_VY_FALLBACK_THRESHOLD;
-            }
-        } else {
-            // Falling down.
-            self.v.1 = PLAYER_VY_MAX.min(self.v.1 * PLAYER_VY_ACC);
-        }
-
-        self.pos.1 += self.v.1;
+        self.jump_g.apply(&mut self.pos, &mut self.v);
 
         // Floor check.
         let floor: f32 = (gfx.height - FLOOR_OFFS_FROM_BOTTOM) as f32;
@@ -134,8 +120,8 @@ impl Player {
         for _ in 0..32 {
             let blood_pos = self.pos;
             let blood_v = (
-                rand::random::<f32>() % 1.0 - 0.5,
-                rand::random::<f32>() % 1.0 - 0.5,
+                rand::random::<f32>() % 1.5 - 0.3,
+                rand::random::<f32>() % 1.0 - 1.0,
             );
             self.bloods.push((blood_pos, blood_v));
         }

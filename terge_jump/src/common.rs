@@ -1,10 +1,6 @@
 use terge::{common::F32Point, gfx::Gfx};
 
 pub(crate) const PLAYER_COLOR: u8 = 97;
-pub(crate) const PLAYER_VY_SLOWDOWN: f32 = 0.9;
-pub(crate) const PLAYER_VY_ACC: f32 = 1.15;
-pub(crate) const PLAYER_VY_MAX: f32 = 2.0;
-pub(crate) const PLAYER_VY_FALLBACK_THRESHOLD: f32 = 0.2;
 pub(crate) const PLAYER_X: u16 = 10;
 
 //                                              Medium       Tall         Long         Short
@@ -14,7 +10,7 @@ pub(crate) const FLOOR_OFFS_FROM_BOTTOM: u16 = 6;
 
 pub(crate) const PLAYER_SPRITE: [[&'static str; 2]; 4] =
     [["O", "^"], ["O", "<"], ["O", "v"], ["O", ">"]];
-pub(crate) const PLAYER_SPRITE_SPEED: u64 = 20;
+pub(crate) const PLAYER_SPRITE_SPEED: u64 = 16;
 
 pub(crate) const TERRAIN_OBSTACLE_DEFAULT_SPEED: f32 = 1.0;
 pub(crate) const TERRAIN_OBSTACLE_COLORS: [u8; 2] = [91, 97];
